@@ -70,6 +70,7 @@ import {
 import { MonoHeader } from "../../monos/ui/MonoHeader";
 import { MonoComposer } from "../../monos/ui/MonoComposer";
 import { ModelControlPills, ModelPicker } from "./ModelPicker";
+import { ContextMeter } from "./ContextMeter";
 import { MonoUsageLimitNotice } from "../../monos/ui/MonoUsageLimitNotice";
 import { QuestionForm } from "./QuestionForm";
 import {
@@ -1216,6 +1217,12 @@ const LocalSessionPane = memo(function LocalSessionPane({
                             onModelSettingsChange(session.id, settings)
                           }
                         />
+                        {/* A Mono is one long conversation; this is how full
+                            its current thread is. It rotates threads itself,
+                            so there is nothing to compact here. */}
+                        <div className="grid place-items-center px-1.5">
+                          <ContextMeter usage={session.context} />
+                        </div>
                       </>
                     }
                   />
