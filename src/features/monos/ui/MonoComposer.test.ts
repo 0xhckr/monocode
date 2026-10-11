@@ -203,7 +203,9 @@ it("opens the system emoji picker on the field, beside attach", () => {
   const button = container.querySelector<HTMLButtonElement>(
     'button[aria-label="Add emoji"]',
   )!;
-  expect(button.previousElementSibling?.textContent).toBe("Add");
+  expect(button.previousElementSibling?.getAttribute("aria-label")).toBe(
+    "Attach files",
+  );
   act(() => button.click());
   expect(emoji.show).toHaveBeenCalledOnce();
   expect(document.activeElement).toBe(container.querySelector("textarea"));

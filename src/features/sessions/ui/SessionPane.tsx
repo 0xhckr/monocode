@@ -1220,7 +1220,7 @@ const LocalSessionPane = memo(function LocalSessionPane({
                         {/* A Mono is one long conversation; this is how full
                             its current thread is. It rotates threads itself,
                             so there is nothing to compact here. */}
-                        <div className="grid place-items-center px-1.5">
+                        <div className="grid size-6.5 place-items-center rounded-md transition-colors hover:bg-content/8">
                           <ContextMeter usage={session.context} />
                         </div>
                       </>

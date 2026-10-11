@@ -36,6 +36,9 @@ const DROP_STATE = { current: { attachmentsSupported: true, remote: false } };
 
 /** Tallest the field grows before it scrolls, in px. */
 const MAX_HEIGHT = 160;
+/** The quiet buttons under the input: a glyph that gains a backdrop on hover. */
+const TOOL_BUTTON =
+  "grid size-6.5 shrink-0 place-items-center rounded-md text-content/55 transition-colors hover:bg-content/8 hover:text-content disabled:opacity-50";
 const INPUT_COLUMNS = "grid-cols-[1.625rem_minmax(0,1fr)_1.625rem]";
 const FIELD_CLASSES =
   "scrollbar-none block min-w-0 w-full resize-none bg-transparent py-1 text-[13px] leading-4.5 text-content outline-none placeholder:text-content/35";
@@ -269,7 +272,10 @@ export function MonoComposer({
     } else clear(result);
   };
 
-  const attachButton = (className: string, label?: string) => (
+  // `tool` sizes the plus to match the emoji face beside it: its cross fills
+  // 14 of the glyph's 24 units against the face's 21, so it is drawn larger,
+  // with a thinner stroke so both lines render about 1px wide.
+  const attachButton = (className: string, tool = false) => (
     <button
       type="button"
       title="Attach files"
@@ -278,8 +284,10 @@ export function MonoComposer({
       onClick={() => readAttachments(pickAttachments)}
       className={className}
     >
-      <Plus className={label ? "size-4" : "size-3.5"} strokeWidth={1.75} />
-      {label ? <span>{label}</span> : null}
+      <Plus
+        className={tool ? "size-4.25" : "size-3.5"}
+        strokeWidth={tool ? 1.5 : 1.75}
+      />
     </button>
   );
   const input = (className: string) => (
@@ -406,10 +414,7 @@ export function MonoComposer({
       </div>
       {inline ? null : (
         <div className="flex min-w-0 items-center gap-0.5 px-1 pt-1">
-          {attachButton(
-            "flex h-6.5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12px] text-content/55 transition-colors hover:text-content disabled:opacity-50",
-            "Add",
-          )}
+          {attachButton(TOOL_BUTTON, true)}
           {canShowEmojiPicker() ? (
             <button
               type="button"
@@ -422,9 +427,9 @@ export function MonoComposer({
                 field.current?.focus();
                 showEmojiPicker();
               }}
-              className="grid size-6.5 shrink-0 place-items-center rounded-md text-content/55 transition-colors hover:text-content disabled:opacity-50"
+              className={TOOL_BUTTON}
             >
-              <SmilePlus className="size-4" strokeWidth={1.75} />
+              <SmilePlus className="size-3.25" strokeWidth={2} />
             </button>
           ) : null}
           <div className="ml-auto flex min-w-0 items-center gap-1">
