@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentTranscript } from "../../src/features/sessions/ui/AgentTranscript";
+import { MonoComposer } from "../../src/features/monos/ui/MonoComposer";
 import type { Block } from "../../src/features/sessions/model/session";
 import {
   saveTranscriptAnchor,
@@ -60,4 +61,59 @@ function Fixture() {
   );
 }
 
-createRoot(host).render(<Fixture />);
+const monoAnswer =
+  "A reply arriving in chunks that should glide smoothly as the conversation grows. ".repeat(
+    35,
+  );
+
+function MonoFixture() {
+  const history = blocks.slice(-12);
+  const prompt: Block = {
+    id: "mono-prompt",
+    role: "user",
+    text: "Explain this in detail",
+  };
+  const [busy, setBusy] = useState(true);
+  const [conversation, setConversation] = useState<Block[]>([
+    ...history,
+    prompt,
+    { id: "mono-answer", role: "assistant", text: monoAnswer, streaming: true },
+  ]);
+  useEffect(() => {
+    Object.assign(window, {
+      completeMonoReply: (text = monoAnswer) => {
+        setConversation([
+          ...history,
+          prompt,
+          { id: "mono-answer", role: "assistant", text, streaming: false },
+        ]);
+        setBusy(false);
+      },
+    });
+  }, []);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1">
+        <AgentTranscript
+          blocks={conversation}
+          busy={busy}
+          agentName="Mono"
+          agentMascot={{ mascot: "crab", color: "#aaf" }}
+          bottomAligned
+          inlineWork
+        />
+      </div>
+      <MonoComposer
+        sessionId="browser-mono"
+        name="Mono"
+        enabled={false}
+        onSubmit={() => false}
+        controls={<span className="h-6.5">Model · Effort · Context</span>}
+      />
+    </div>
+  );
+}
+
+const mono = new URLSearchParams(location.search).has("mono");
+if (mono) root.style.width = "540px";
+createRoot(host).render(mono ? <MonoFixture /> : <Fixture />);

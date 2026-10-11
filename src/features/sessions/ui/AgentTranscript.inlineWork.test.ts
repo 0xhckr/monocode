@@ -331,6 +331,100 @@ it("keeps launched session cards in place while the Mono's report back arrives",
   ).toBeTruthy();
 });
 
+it("shows reused sessions in the requesting Mono after its handoff reply, before its completion report", () => {
+  const launches = [
+    {
+      id: "app-other-mono-one",
+      title: "Meaning in everyday life",
+      harness: "codex",
+      model: "gpt-6",
+    },
+    {
+      id: "app-other-mono-two",
+      title: "Growth through change",
+      harness: "codex",
+      model: "gpt-6",
+    },
+  ];
+  const receipt = (id: string, action: string, result: unknown): Block => ({
+    ...tool(id),
+    text: `monocode app ${action}`,
+    tool: { status: "completed", detail: JSON.stringify({ ok: true, result }) },
+  });
+  const blocks: Block[] = [
+    { id: "old", role: "user", text: "Earlier task", durationMs: 1000 },
+    { id: "old-answer", role: "assistant", text: "Earlier answer" },
+    {
+      id: "user",
+      role: "user",
+      text: "Write two articles",
+      startedAt: 1000,
+      durationMs: 1000,
+    },
+    receipt("list", "sessions.list", {
+      cwd: "/repo/formshare",
+      sessions: launches,
+    }),
+    // This prose splits the listing and sends into separate folded groups.
+    {
+      id: "assigning",
+      role: "assistant",
+      text: "Assigning two existing sessions.",
+    },
+    ...launches.map((entry) =>
+      receipt(`send-${entry.id}`, "sessions.send", {
+        sessionId: entry.id,
+        submitted: true,
+        notifyOnComplete: true,
+      }),
+    ),
+    {
+      id: "started",
+      role: "assistant",
+      text: "Both article sessions are running.",
+    },
+    {
+      id: "completion",
+      role: "user",
+      text: "Both finished",
+      internal: true,
+      appRequestId: "mono-completion-batch-articles",
+      startedAt: 5000,
+      durationMs: 1000,
+    },
+    { id: "report", role: "assistant", text: "Both articles are finished." },
+  ];
+  const onOpenSession = vi.fn();
+  render(blocks, { onOpenSession, agentName: "MonoShroom" });
+  expect(container.querySelectorAll("[data-transcript-turn]")).toHaveLength(2);
+  const cards = container.querySelector("[data-launched-sessions]")!;
+  expect(cards).not.toBeNull();
+  expect(container.querySelectorAll("[data-launched-session]")).toHaveLength(2);
+  expect(
+    cards
+      .closest("[data-transcript-turn]")
+      ?.getAttribute("data-transcript-turn"),
+  ).toBe("user");
+  expect(
+    container
+      .querySelector('[data-chat-message="started"]')!
+      .compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    cards.compareDocumentPosition(
+      container.querySelector('[data-chat-message="report"]')!,
+    ) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  act(() =>
+    cards.querySelector<HTMLButtonElement>("[data-launched-session]")!.click(),
+  );
+  expect(onOpenSession).toHaveBeenCalledWith(
+    "user",
+    blocks.slice(2),
+    launches[0].id,
+  );
+});
+
 it("waits for the final reply's reveal, then shows its artifact before the actions", () => {
   localStorage.setItem(PACED_REVEAL_KEY, "1");
   const user: Block = {

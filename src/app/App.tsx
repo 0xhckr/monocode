@@ -463,6 +463,7 @@ import {
   type RuntimeMode,
   type PlanStatus,
   type SecondOpinionMeta,
+  type MonoSpawnedSession,
   type Session,
   type UsageLimit,
   type WorkspaceMode,
@@ -10655,6 +10656,22 @@ function Workspace({
           ? groupMonoTurns(source.blocks)
           : [];
         const sourceTurnId = sourceTurns[sourceTurns.length - 1]?.[0]?.id;
+        const rememberSession = (entry: MonoSpawnedSession) => {
+          if (!sourceTurnId) return;
+          const next = sessionsRef.current.map((session) =>
+            session.id === source.id
+              ? recordMonoSpawnedSession(session, sourceTurnId, entry)
+              : session,
+          );
+          if (
+            next.every(
+              (session, index) => session === sessionsRef.current[index],
+            )
+          )
+            return;
+          sessionsRef.current = next;
+          setSessions(next);
+        };
         const monitorCompletion = (
           monoId: string,
           sessionId: string,
@@ -10706,32 +10723,18 @@ function Workspace({
           {
             start: async (launch, id, placement, notifyMonoId) => {
               const rememberLaunch = () => {
-                if (!sourceTurnId) return;
                 const created =
                   sessionsRef.current.find((session) => session.id === id) ??
                   existing;
-                const next = sessionsRef.current.map((session) =>
-                  session.id === source.id
-                    ? recordMonoSpawnedSession(session, sourceTurnId, {
-                        sessionId: id,
-                        cwd: created?.cwd ?? launch.cwd,
-                        title:
-                          created?.title ?? launch.prompt.trim().slice(0, 300),
-                        harness: created?.harness ?? launch.harness,
-                        model:
-                          created?.model ??
-                          resolveModel(launch.harness, launch.model).id,
-                      })
-                    : session,
-                );
-                if (
-                  next.every(
-                    (session, index) => session === sessionsRef.current[index],
-                  )
-                )
-                  return;
-                sessionsRef.current = next;
-                setSessions(next);
+                rememberSession({
+                  sessionId: id,
+                  cwd: created?.cwd ?? launch.cwd,
+                  title: created?.title ?? launch.prompt.trim().slice(0, 300),
+                  harness: created?.harness ?? launch.harness,
+                  model:
+                    created?.model ??
+                    resolveModel(launch.harness, launch.model).id,
+                });
               };
               const open = sessionsRef.current.find(
                 (session) => session.id === id,
@@ -10845,6 +10848,18 @@ function Workspace({
                 orchestrator.run(id)
               )
                 throw new Error("Session is unavailable in this project");
+              const rememberFollowUp = () => {
+                const current =
+                  sessionsRef.current.find((session) => session.id === id) ??
+                  target;
+                rememberSession({
+                  sessionId: id,
+                  cwd: current.cwd,
+                  title: current.title,
+                  harness: current.harness,
+                  model: current.model,
+                });
+              };
               const previous = target.blocks.find(
                 (block) => block.appRequestId === requestId,
               );
@@ -10855,6 +10870,7 @@ function Workspace({
                   );
                 if (previous.draft)
                   throw new Error("Request ID belongs to an unsent draft");
+                rememberFollowUp();
                 return { alreadySubmitted: true };
               }
               if (target.busy)
@@ -10890,6 +10906,7 @@ function Workspace({
                 onSettled?.discard();
                 throw new Error("Session could not accept the follow-up");
               }
+              rememberFollowUp();
               onSettled?.accept();
               return { alreadySubmitted: false };
             },

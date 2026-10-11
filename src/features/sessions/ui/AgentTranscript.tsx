@@ -1012,6 +1012,7 @@ function AgentTranscriptComponent({
     historicalBlockIds,
     bottomAligned,
     wheelHold,
+    bottomAligned,
   );
 
   return (
@@ -2863,9 +2864,10 @@ function launchAnchors(
   const atEnd: MonoSpawnedSession[] = [];
   if (launches.length === 0) return { afterItem, atEnd };
   const launched = items.map((item) =>
-    monoSpawnedSessions(item.type === "block" ? [item.block] : item.blocks).map(
-      (entry) => entry.sessionId,
-    ),
+    monoSpawnedSessions(
+      item.type === "block" ? [item.block] : item.blocks,
+      launches,
+    ).map((entry) => entry.sessionId),
   );
   for (const launch of launches) {
     // The tool call that started it; the prompt also lists it, as a fallback.
