@@ -14,6 +14,13 @@ vi.mock("../../sessions/model/attachments", async (original) => ({
 vi.mock("../../sessions/hooks/useFileDrop", () => ({
   useFileDrop: () => false,
 }));
+const { emoji } = vi.hoisted(() => ({
+  emoji: { available: false, show: vi.fn() },
+}));
+vi.mock("../../../platform/tauri/emojiPicker", () => ({
+  canShowEmojiPicker: () => emoji.available,
+  showEmojiPicker: emoji.show,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -187,4 +194,22 @@ it("follows the composer autocorrect setting", () => {
 
   act(() => saveComposerAutocorrect(true));
   expect(field().getAttribute("spellcheck")).toBe("true");
+});
+
+it("opens the system emoji picker on the field, beside attach", () => {
+  emoji.available = true;
+  emoji.show.mockReset();
+  render({ controls: createElement("span", null, "Model") });
+  const button = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Add emoji"]',
+  )!;
+  expect(button.previousElementSibling?.textContent).toBe("Add");
+  act(() => button.click());
+  expect(emoji.show).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(container.querySelector("textarea"));
+
+  // The floating chat keeps its inline input, without the extra row.
+  render();
+  expect(container.querySelector('button[aria-label="Add emoji"]')).toBeNull();
+  emoji.available = false;
 });

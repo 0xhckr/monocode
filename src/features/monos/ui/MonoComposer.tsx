@@ -6,7 +6,11 @@ import {
   type ReactNode,
 } from "react";
 import { isImeComposition } from "../../../shared/lib/keyboard";
-import { ArrowUp, Plus } from "../../../shared/ui/icons";
+import { ArrowUp, Plus, SmilePlus } from "../../../shared/ui/icons";
+import {
+  canShowEmojiPicker,
+  showEmojiPicker,
+} from "../../../platform/tauri/emojiPicker";
 import { AttachmentChip } from "../../sessions/ui/AttachmentChip";
 import type { Attachment } from "../../sessions/model/session";
 import {
@@ -401,11 +405,28 @@ export function MonoComposer({
         )}
       </div>
       {inline ? null : (
-        <div className="flex min-w-0 items-center gap-2 px-1 pt-1">
+        <div className="flex min-w-0 items-center gap-0.5 px-1 pt-1">
           {attachButton(
             "flex h-6.5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12px] text-content/55 transition-colors hover:text-content disabled:opacity-50",
             "Add",
           )}
+          {canShowEmojiPicker() ? (
+            <button
+              type="button"
+              title="Emoji"
+              aria-label="Add emoji"
+              disabled={!enabled || submitting}
+              // The picker types into whatever has focus, so keep the field's.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                field.current?.focus();
+                showEmojiPicker();
+              }}
+              className="grid size-6.5 shrink-0 place-items-center rounded-md text-content/55 transition-colors hover:text-content disabled:opacity-50"
+            >
+              <SmilePlus className="size-4" strokeWidth={1.75} />
+            </button>
+          ) : null}
           <div className="ml-auto flex min-w-0 items-center gap-1">
             {controls}
           </div>

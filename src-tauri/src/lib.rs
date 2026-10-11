@@ -210,6 +210,12 @@ fn set_dock_badge(
 }
 
 #[tauri::command]
+fn show_emoji_picker(#[allow(unused_variables)] window: tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    macos::show_character_palette(&window);
+}
+
+#[tauri::command]
 fn set_trackpad_zoom_enabled(
     #[allow(unused_variables)] window: tauri::WebviewWindow,
     #[allow(unused_variables)] enabled: bool,
@@ -543,6 +549,7 @@ pub fn run() {
             set_window_background_blur,
             set_dock_badge,
             set_trackpad_zoom_enabled,
+            show_emoji_picker,
             #[cfg(target_os = "macos")]
             menu::keybindings_set_overrides,
             #[cfg(target_os = "macos")]

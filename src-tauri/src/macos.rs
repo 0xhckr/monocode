@@ -115,6 +115,26 @@ pub fn install(window: &WebviewWindow) {
 
 /// Slack-style red count on the Dock icon. `count` is this window's pending
 /// approvals; the tile shows the sum across windows.
+/// Opens the system emoji picker over the focused field, as Ctrl-Cmd-Space
+/// does. Picks are typed into that field like any other input.
+pub fn show_character_palette(window: &WebviewWindow) {
+    let apply = || {
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        let app = NSApplication::sharedApplication(mtm);
+        let sender: Option<&NSObject> = None;
+        unsafe {
+            let _: () = msg_send![&*app, orderFrontCharacterPalette: sender];
+        }
+    };
+    if MainThreadMarker::new().is_some() {
+        apply();
+        return;
+    }
+    let _ = window.app_handle().run_on_main_thread(apply);
+}
+
 pub fn set_window_badge(window: &WebviewWindow, count: u32) {
     let label = window.label().to_string();
     let apply = move || paint_window_badge(&label, count);
