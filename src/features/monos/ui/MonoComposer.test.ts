@@ -14,13 +14,18 @@ vi.mock("../../sessions/model/attachments", async (original) => ({
 vi.mock("../../sessions/hooks/useFileDrop", () => ({
   useFileDrop: () => false,
 }));
-const { emoji } = vi.hoisted(() => ({
-  emoji: { available: false, show: vi.fn() },
-}));
-vi.mock("../../../platform/tauri/emojiPicker", () => ({
-  canShowEmojiPicker: () => emoji.available,
-  showEmojiPicker: emoji.show,
-}));
+// The picker itself is covered on its own; here it just hands over a pick.
+vi.mock("../../../shared/ui/EmojiPicker", async () => {
+  const { createElement } = await import("react");
+  return {
+    EmojiPickerPopover: ({ onPick }: { onPick: (emoji: string) => void }) =>
+      createElement(
+        "button",
+        { type: "button", "data-pick": "", onClick: () => onPick("😀") },
+        "pick",
+      ),
+  };
+});
 
 let container: HTMLDivElement;
 let root: Root;
@@ -196,22 +201,35 @@ it("follows the composer autocorrect setting", () => {
   expect(field().getAttribute("spellcheck")).toBe("true");
 });
 
-it("opens the system emoji picker on the field, beside attach", () => {
-  emoji.available = true;
-  emoji.show.mockReset();
+it("inserts a picked emoji where the cursor was, beside attach", async () => {
   render({ controls: createElement("span", null, "Model") });
+  const field = container.querySelector("textarea")!;
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(field, "hi there");
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  field.setSelectionRange(2, 2);
   const button = container.querySelector<HTMLButtonElement>(
     'button[aria-label="Add emoji"]',
   )!;
   expect(button.previousElementSibling?.getAttribute("aria-label")).toBe(
     "Attach files",
   );
-  act(() => button.click());
-  expect(emoji.show).toHaveBeenCalledOnce();
-  expect(document.activeElement).toBe(container.querySelector("textarea"));
+  // The picker loads on first open.
+  await act(async () => button.click());
+  await vi.waitFor(() =>
+    expect(container.querySelector("[data-pick]")).not.toBeNull(),
+  );
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  act(() => container.querySelector<HTMLButtonElement>("[data-pick]")!.click());
+  expect(field.value).toBe("hi😀 there");
+  expect(container.querySelector("[data-pick]")).toBeNull();
 
   // The floating chat keeps its inline input, without the extra row.
   render();
   expect(container.querySelector('button[aria-label="Add emoji"]')).toBeNull();
-  emoji.available = false;
 });

@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useLayoutEffect,
   useRef,
@@ -7,10 +9,6 @@ import {
 } from "react";
 import { isImeComposition } from "../../../shared/lib/keyboard";
 import { ArrowUp, Plus, SmilePlus } from "../../../shared/ui/icons";
-import {
-  canShowEmojiPicker,
-  showEmojiPicker,
-} from "../../../platform/tauri/emojiPicker";
 import { AttachmentChip } from "../../sessions/ui/AttachmentChip";
 import type { Attachment } from "../../sessions/model/session";
 import {
@@ -31,6 +29,13 @@ import {
   consumeQuoteRequest,
   type QuoteRequest,
 } from "../../sessions/model/quoteDraft";
+
+// Loaded on first open, with its emoji data, so neither weighs on startup.
+const EmojiPickerPopover = lazy(() =>
+  import("../../../shared/ui/EmojiPicker").then((module) => ({
+    default: module.EmojiPickerPopover,
+  })),
+);
 
 const DROP_STATE = { current: { attachmentsSupported: true, remote: false } };
 
@@ -156,6 +161,30 @@ export function MonoComposer({
     setText(next);
     setComposerDraft(sessionId, next);
     onDraftChange?.(next);
+  };
+  const emojiButton = useRef<HTMLButtonElement>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  // Where the pick goes: the field's selection when the picker opened.
+  const emojiSelection = useRef<[number, number] | null>(null);
+  const toggleEmoji = () => {
+    if (emojiOpen) return setEmojiOpen(false);
+    const el = field.current;
+    emojiSelection.current = el ? [el.selectionStart, el.selectionEnd] : null;
+    setEmojiOpen(true);
+  };
+  const insertEmoji = (emoji: string) => {
+    const current = textRef.current;
+    const [start, end] = emojiSelection.current ?? [
+      current.length,
+      current.length,
+    ];
+    update(current.slice(0, start) + emoji + current.slice(end));
+    setEmojiOpen(false);
+    const caret = start + emoji.length;
+    requestAnimationFrame(() => {
+      field.current?.focus();
+      field.current?.setSelectionRange(caret, caret);
+    });
   };
   useLayoutEffect(() => {
     const next = consumeQuoteRequest(
@@ -415,22 +444,29 @@ export function MonoComposer({
       {inline ? null : (
         <div className="flex min-w-0 items-center gap-0.5 px-1 pt-1">
           {attachButton(TOOL_BUTTON, true)}
-          {canShowEmojiPicker() ? (
-            <button
-              type="button"
-              title="Emoji"
-              aria-label="Add emoji"
-              disabled={!enabled || submitting}
-              // The picker types into whatever has focus, so keep the field's.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                field.current?.focus();
-                showEmojiPicker();
-              }}
-              className={TOOL_BUTTON}
-            >
-              <SmilePlus className="size-3.25" strokeWidth={2} />
-            </button>
+          <button
+            ref={emojiButton}
+            type="button"
+            title="Emoji"
+            aria-label="Add emoji"
+            aria-expanded={emojiOpen}
+            disabled={!enabled || submitting}
+            onClick={toggleEmoji}
+            className={`${TOOL_BUTTON} ${emojiOpen ? "bg-content/8 text-content" : ""}`}
+          >
+            <SmilePlus className="size-3.25" strokeWidth={2} />
+          </button>
+          {emojiOpen ? (
+            <Suspense fallback={null}>
+              <EmojiPickerPopover
+                anchor={emojiButton}
+                onPick={insertEmoji}
+                onDismiss={() => {
+                  setEmojiOpen(false);
+                  field.current?.focus();
+                }}
+              />
+            </Suspense>
           ) : null}
           <div className="ml-auto flex min-w-0 items-center gap-1">
             {controls}
