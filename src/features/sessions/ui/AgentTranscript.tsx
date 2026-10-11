@@ -1586,6 +1586,7 @@ function AgentTranscriptComponent({
                 standaloneReply ||
                 (inlineWork && firstWork >= 0)) ? (
                 <TurnDuration
+                  revealOnHover={inlineWork}
                   elapsedMs={durationMs ?? null}
                   label={
                     standaloneReply ? (agentName ?? habit?.name) : undefined
@@ -1808,6 +1809,7 @@ function TurnDuration({
   onSecondOpinion,
   onHandoff,
   extraAction,
+  revealOnHover = false,
 }: {
   elapsedMs: number | null;
   label?: string;
@@ -1827,6 +1829,8 @@ function TurnDuration({
   onSecondOpinion?: (target: ModelTarget) => void;
   onHandoff?: (target: ModelTarget) => void;
   extraAction?: ReactNode;
+  /** Sit in the gap under the turn and show on hover, as a sent message's do. */
+  revealOnHover?: boolean;
 }) {
   const label =
     completionLabel ?? formatWorkingDuration(elapsedMs, modelName, true);
@@ -1840,7 +1844,7 @@ function TurnDuration({
     <div
       data-turn-actions
       aria-label={label}
-      className="flex w-full min-w-0 max-w-full items-center gap-2.5 overflow-hidden px-4 pt-1 pb-3 font-sans text-sm text-content/40"
+      className={`flex w-full min-w-0 max-w-full items-center gap-2.5 overflow-hidden px-4 pt-1 pb-3 font-sans text-sm text-content/40${revealOnHover ? " turn-actions-hover" : ""}`}
     >
       <span className="flex shrink-0 items-center gap-1">
         {output ? (

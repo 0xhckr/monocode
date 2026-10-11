@@ -717,8 +717,44 @@ html.has-chat-background.chat-background-effect-ready.chat-background-gradient-b
   }
 }
 
+/* A Mono's turn keeps its actions the way a sent message does: in a fixed
+ * gap under the turn, shown on hover, so revealing them shifts nothing. One
+ * whose panel is open stays visible. */
+@media (hover: hover) and (pointer: fine) {
+  /* With the reply's own spacing above it, this fits the row exactly and
+   * leaves about the gap a sent message has before the reply to it. */
+  .transcript-turn:has(> .turn-actions-hover) {
+    position: relative;
+    padding-bottom: 1rem;
+  }
+
+  .turn-actions-hover {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    height: 1.5rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  /* The reply's actions answer to the reply: hovering the prompt above it,
+   * whose own actions show then, or its day stamp, leaves them hidden. */
+  .transcript-turn:hover:not(
+      :has([data-prompt-anchor]:hover, [data-day-separator]:hover)
+    )
+    > .turn-actions-hover,
+  .turn-actions-hover:focus-within,
+  .turn-actions-hover:has([aria-expanded="true"]) {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .user-message-actions {
+  .user-message-actions,
+  .turn-actions-hover {
     transition: none;
   }
 }
