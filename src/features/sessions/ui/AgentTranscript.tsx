@@ -1437,7 +1437,7 @@ function AgentTranscriptComponent({
             <div
               key={turn[0].id}
               data-transcript-turn={turnId}
-              className={`transcript-turn flex min-w-0 flex-col${
+              className={`transcript-turn flex min-w-0 flex-col${inlineWork && !reactedOnly ? " transcript-turn-mono" : ""}${
                 isLastTurn ? " transcript-turn-live" : ""
               }${
                 promptAnchor && anchorTurn && isLastTurn && userBlock

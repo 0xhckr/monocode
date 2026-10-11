@@ -10,6 +10,85 @@ type MonoScrollWindow = Window & {
   }[];
 };
 
+type MonoCompletionWindow = Window & {
+  beginMonoCompletion: () => void;
+  finishMonoCompletion: () => void;
+  startCompletionSamples: () => void;
+  finishCompletionSamples: () => { cardTop: number; height: number }[];
+};
+
+for (const length of ["short", "scrolling"]) {
+  test(`a Mono completion attaches without reversing the ${length} chat's motion`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `/tests/browser/transcript.html?monoCompletion${length === "short" ? "&short" : ""}`,
+    );
+    const scroller = page.locator(".agent-transcript");
+    const card = scroller.locator("[data-launched-session]");
+    const content = scroller.locator("[data-transcript-content]");
+    await expect(card).toHaveAttribute("data-state", "working");
+    await page.evaluate(() => document.fonts.ready);
+    await expect(content).toHaveCSS("transform", "none");
+    await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>(".agent-transcript")!;
+      const card = el.querySelector<HTMLElement>("[data-launched-session]")!;
+      const read = () => ({
+        cardTop: card.getBoundingClientRect().top,
+        height: el.scrollHeight,
+      });
+      let samples: ReturnType<typeof read>[] = [];
+      let frame = 0;
+      const sample = () => {
+        samples.push(read());
+        frame = requestAnimationFrame(sample);
+      };
+      Object.assign(window, {
+        startCompletionSamples: () => {
+          samples = [read()];
+          frame = requestAnimationFrame(sample);
+        },
+        finishCompletionSamples: () => {
+          cancelAnimationFrame(frame);
+          return samples;
+        },
+      });
+      (window as MonoCompletionWindow).startCompletionSamples();
+      (window as MonoCompletionWindow).beginMonoCompletion();
+    });
+    await expect(card).toHaveAttribute("data-state", "done");
+    // Let a temporary height correction complete; a final-position-only
+    // assertion would miss the visible dip before the report is attached.
+    await page.waitForTimeout(500);
+    const reopened = await page.evaluate(() =>
+      (window as MonoCompletionWindow).finishCompletionSamples(),
+    );
+    const tops = reopened.map((sample) => sample.cardTop);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
+
+    await page.evaluate(() => {
+      (window as MonoCompletionWindow).startCompletionSamples();
+      (window as MonoCompletionWindow).finishMonoCompletion();
+    });
+    await expect(
+      scroller.locator('[data-chat-message="mono-report"]'),
+    ).toBeVisible();
+    await expect(content).toHaveCSS("transform", "none");
+    const attached = await page.evaluate(() =>
+      (window as MonoCompletionWindow).finishCompletionSamples(),
+    );
+    const reversals = attached
+      .slice(1)
+      .filter((sample, index) => sample.cardTop > attached[index].cardTop + 1);
+    expect(reversals).toEqual([]);
+    expect(attached[0].cardTop - attached.at(-1)!.cardTop).toBeGreaterThan(100);
+    await expect(scroller.locator("[data-transcript-turn]")).toHaveCount(
+      length === "short" ? 1 : 7,
+    );
+    await expect(scroller.locator("[data-launched-session]")).toHaveCount(1);
+  });
+}
+
 test("a completed Mono reply glides through its full height", async ({
   page,
 }) => {

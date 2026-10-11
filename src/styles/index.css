@@ -721,11 +721,12 @@ html.has-chat-background.chat-background-effect-ready.chat-background-gradient-b
  * gap under the turn, shown on hover, so revealing them shifts nothing. One
  * whose panel is open stays visible. */
 @media (hover: hover) and (pointer: fine) {
-  /* With the reply's own spacing above it, this fits the row exactly and
-   * leaves about the gap a sent message has before the reply to it. */
-  .transcript-turn:has(> .turn-actions-hover) {
+  /* Leave breathing room above the buttons. Keep the gap while a
+   * completion report reopens the same turn and its
+   * actions are temporarily absent. Shrinking it makes the chat dip first. */
+  .transcript-turn-mono {
     position: relative;
-    padding-bottom: 1rem;
+    padding-bottom: 1.5rem;
   }
 
   .turn-actions-hover {

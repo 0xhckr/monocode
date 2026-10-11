@@ -114,6 +114,104 @@ function MonoFixture() {
   );
 }
 
-const mono = new URLSearchParams(location.search).has("mono");
-if (mono) root.style.width = "540px";
-createRoot(host).render(mono ? <MonoFixture /> : <Fixture />);
+function MonoCompletionFixture() {
+  const history = new URLSearchParams(location.search).has("short")
+    ? []
+    : blocks.slice(-12);
+  const start = Date.now();
+  const launched = {
+    sessionId: "app-mono-review",
+    cwd: "/repo",
+    title: "Review the changes",
+    harness: "codex" as const,
+    model: "gpt-6",
+  };
+  const original: Block[] = [
+    ...history,
+    {
+      id: "mono-request",
+      role: "user",
+      text: "Start a review session and report back",
+      startedAt: start,
+      durationMs: 1000,
+      monoSpawnedSessions: [launched],
+    },
+    {
+      id: "mono-launch",
+      role: "tool",
+      text: "Start a session",
+      tool: { kind: "execute", status: "completed" },
+    },
+    {
+      id: "mono-handoff",
+      role: "assistant",
+      text: "I started the review session. I’ll report back when it finishes.",
+    },
+  ];
+  const completion: Block = {
+    id: "mono-completion",
+    role: "user",
+    text: "Review complete",
+    internal: true,
+    appRequestId: "mono-completion-batch-review",
+    startedAt: start + 5000,
+  };
+  const [conversation, setConversation] = useState(original);
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<"working" | "done">("working");
+  useEffect(() => {
+    Object.assign(window, {
+      beginMonoCompletion: () => {
+        setConversation([...original, completion]);
+        setBusy(true);
+        setState("done");
+      },
+      finishMonoCompletion: () => {
+        setConversation([
+          ...original,
+          { ...completion, durationMs: 1000 },
+          {
+            id: "mono-report",
+            role: "assistant",
+            text: "The review is complete. Here are the results. ".repeat(40),
+          },
+        ]);
+        setBusy(false);
+      },
+    });
+  }, []);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1">
+        <AgentTranscript
+          blocks={conversation}
+          busy={busy}
+          agentName="Mono"
+          agentMascot={{ mascot: "crab", color: "#aaf" }}
+          bottomAligned
+          inlineWork
+          onOpenSession={() => {}}
+          onShowWork={() => {}}
+          launchedSessions={
+            new Map([[launched.sessionId, { state, title: launched.title }]])
+          }
+        />
+      </div>
+      <MonoComposer
+        sessionId="completion-mono"
+        name="Mono"
+        enabled={false}
+        onSubmit={() => false}
+        controls={<span className="h-6.5">Model · Effort · Context</span>}
+      />
+    </div>
+  );
+}
+
+const params = new URLSearchParams(location.search);
+const mono = params.has("mono");
+const completion = params.has("monoCompletion");
+if (mono || completion) root.style.width = "540px";
+createRoot(host).render(
+  completion ? <MonoCompletionFixture /> : mono ? <MonoFixture /> : <Fixture />,
+);
