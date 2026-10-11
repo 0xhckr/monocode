@@ -1,4 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { isImeComposition } from "../../../shared/lib/keyboard";
 import { ArrowUp, Plus } from "../../../shared/ui/icons";
 import { AttachmentChip } from "../../sessions/ui/AttachmentChip";
@@ -44,13 +50,20 @@ type Props = {
     attachments: Attachment[],
   ) => boolean | void | Promise<boolean | void>;
   onFocus?: () => void;
+  /**
+   * Sits under the input on the right, like the model and its effort, with
+   * attach across from it. Without any, attach and send share the field's
+   * line, as in the floating chat.
+   */
+  controls?: ReactNode;
 };
 
 /**
  * A messaging app's input for the Mono: attach, type, send, whether or not
  * it is mid-reply; Escape stops a reply. Files dropped anywhere on the chat
- * attach here. The model, permissions and checkout
- * live in the details panel instead.
+ * attach here. Attach sits under the input, with any `controls` (the model
+ * and its effort) across from it, or beside the field when there are none;
+ * permissions and checkout live in the details panel.
  */
 export function MonoComposer({
   sessionId,
@@ -62,6 +75,7 @@ export function MonoComposer({
   onDraftChange,
   onSubmit,
   onFocus,
+  controls,
 }: Props) {
   const [text, setText] = useState(() => getComposerDraft(sessionId) ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -84,24 +98,27 @@ export function MonoComposer({
     !submitting &&
     pendingReads === 0 &&
     (text.trim().length > 0 || attachments.length > 0);
-  // Attachments sit above the field like a second line of text, so the field
-  // moves above the buttons for them too.
-  const stacked = multiline || attachments.length > 0;
+  const inline = !controls;
+  // Attachments sit above the field like a second line of text, so an inline
+  // field moves above the buttons for them too.
+  const stacked = inline && (multiline || attachments.length > 0);
 
   useLayoutEffect(() => {
     const el = field.current;
+    if (!el) return;
     const measure = inlineMeasure.current;
-    if (!el || !measure) return;
     const fit = () => {
-      if (!measure.clientWidth) return;
-      // Always measure at the inline width. Expanding the field above the
-      // buttons must not make it collapse again just because it is wider.
-      const style = getComputedStyle(measure);
-      const singleLineHeight =
-        Number.parseFloat(style.lineHeight) +
-        Number.parseFloat(style.paddingTop) +
-        Number.parseFloat(style.paddingBottom);
-      setMultiline(measure.scrollHeight > singleLineHeight + 1);
+      if (!el.clientWidth) return;
+      if (measure?.clientWidth) {
+        // Always measure at the inline width. Expanding the field above the
+        // buttons must not make it collapse again just because it is wider.
+        const style = getComputedStyle(measure);
+        const singleLineHeight =
+          Number.parseFloat(style.lineHeight) +
+          Number.parseFloat(style.paddingTop) +
+          Number.parseFloat(style.paddingBottom);
+        setMultiline(measure.scrollHeight > singleLineHeight + 1);
+      }
       // Holds the input's height while measuring, as sessions do, so the
       // transcript above never grows for a moment and loses its bottom pin.
       resizeComposer(el, MAX_HEIGHT);
@@ -110,9 +127,16 @@ export function MonoComposer({
     fit();
     // An empty field stays one line at any width, so once measured, resizing
     // the panes beside it need not measure it every frame.
-    if (!text && measure.clientWidth) return;
-    const observer = new ResizeObserver(fit);
-    observer.observe(measure);
+    const sized = measure ?? el;
+    if (!text && sized.clientWidth) return;
+    let width = sized.clientWidth;
+    const observer = new ResizeObserver(() => {
+      // Only a new width can rewrap the text; growing taller is our own doing.
+      if (sized.clientWidth === width) return;
+      width = sized.clientWidth;
+      fit();
+    });
+    observer.observe(sized);
     return () => observer.disconnect();
   }, [text, multiline, stacked]);
 
@@ -241,6 +265,63 @@ export function MonoComposer({
     } else clear(result);
   };
 
+  const attachButton = (className: string, label?: string) => (
+    <button
+      type="button"
+      title="Attach files"
+      aria-label="Attach files"
+      disabled={!enabled || submitting}
+      onClick={() => readAttachments(pickAttachments)}
+      className={className}
+    >
+      <Plus className={label ? "size-4" : "size-3.5"} strokeWidth={1.75} />
+      {label ? <span>{label}</span> : null}
+    </button>
+  );
+  const input = (className: string) => (
+    <textarea
+      ref={field}
+      rows={1}
+      aria-label={`Message ${name}`}
+      placeholder={`Message ${name}`}
+      spellCheck={autocorrect}
+      autoCorrect={autocorrect ? "on" : "off"}
+      disabled={!enabled || submitting}
+      value={text}
+      onFocus={onFocus}
+      onChange={(event) => update(event.target.value)}
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Enter" ||
+          event.shiftKey ||
+          isImeComposition(event.nativeEvent)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        send();
+      }}
+      onPaste={(event) => {
+        const files = filesFromClipboard(event.clipboardData);
+        if (files.length === 0) return;
+        event.preventDefault();
+        readAttachments(() => attachmentsFromFiles(files));
+      }}
+      className={`${FIELD_CLASSES} ${className}`}
+    />
+  );
+  const sendButton = (className: string) => (
+    <button
+      type="submit"
+      aria-label="Send"
+      title={pendingReads ? "Reading attachments…" : "Send"}
+      disabled={!ready}
+      className={`primary-action grid size-6.5 place-items-center rounded-md transition-[background-color,color,transform] duration-150 active:scale-90 disabled:cursor-default ${className}`}
+    >
+      <ArrowUp className="size-3.5" strokeWidth={2} />
+    </button>
+  );
+
   return (
     <form
       className="mx-auto w-full max-w-4xl shrink-0 p-1.5 pt-0 font-sans"
@@ -282,74 +363,54 @@ export function MonoComposer({
             ))}
           </div>
         ) : null}
-        <div
-          data-layout={stacked ? "multiline" : "inline"}
-          className={`relative grid min-h-9 ${INPUT_COLUMNS} items-center gap-x-1.5 p-1 ${stacked ? "gap-y-1" : ""}`}
-        >
+        {inline ? (
           <div
-            aria-hidden="true"
-            className={`pointer-events-none invisible absolute inset-x-1 top-1 grid ${INPUT_COLUMNS} gap-x-1.5`}
+            data-layout={stacked ? "multiline" : "inline"}
+            className={`relative grid min-h-9 ${INPUT_COLUMNS} items-center gap-x-1.5 p-1 ${stacked ? "gap-y-1" : ""}`}
           >
-            <textarea
-              ref={inlineMeasure}
-              tabIndex={-1}
-              readOnly
-              rows={1}
-              value={text}
-              className={`${FIELD_CLASSES} col-start-2 h-0 overflow-hidden`}
-            />
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none invisible absolute inset-x-1 top-1 grid ${INPUT_COLUMNS} gap-x-1.5`}
+            >
+              <textarea
+                ref={inlineMeasure}
+                tabIndex={-1}
+                readOnly
+                rows={1}
+                value={text}
+                className={`${FIELD_CLASSES} col-start-2 h-0 overflow-hidden`}
+              />
+            </div>
+            {attachButton(
+              `col-start-1 grid size-6.5 place-items-center rounded-md bg-content/8 text-content/55 hover:bg-content/12 hover:text-content ${stacked ? "row-start-2" : "row-start-1"}`,
+            )}
+            {input(
+              `row-start-1 ${stacked ? "col-span-3 col-start-1 px-1.5" : "col-start-2"}`,
+            )}
+            {sendButton(
+              `col-start-3 ${stacked ? "row-start-2" : "row-start-1"}`,
+            )}
           </div>
-          <button
-            type="button"
-            title="Attach files"
-            aria-label="Attach files"
-            disabled={!enabled || submitting}
-            onClick={() => readAttachments(pickAttachments)}
-            className={`col-start-1 grid size-6.5 place-items-center rounded-md bg-content/8 text-content/55 hover:bg-content/12 hover:text-content ${stacked ? "row-start-2" : "row-start-1"}`}
-          >
-            <Plus className="size-3.5" strokeWidth={1.75} />
-          </button>
-          <textarea
-            ref={field}
-            rows={1}
-            aria-label={`Message ${name}`}
-            placeholder={`Message ${name}`}
-            spellCheck={autocorrect}
-            autoCorrect={autocorrect ? "on" : "off"}
-            disabled={!enabled || submitting}
-            value={text}
-            onFocus={onFocus}
-            onChange={(event) => update(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key !== "Enter" ||
-                event.shiftKey ||
-                isImeComposition(event.nativeEvent)
-              ) {
-                return;
-              }
-              event.preventDefault();
-              send();
-            }}
-            onPaste={(event) => {
-              const files = filesFromClipboard(event.clipboardData);
-              if (files.length === 0) return;
-              event.preventDefault();
-              readAttachments(() => attachmentsFromFiles(files));
-            }}
-            className={`${FIELD_CLASSES} row-start-1 ${stacked ? "col-span-3 col-start-1 px-1.5" : "col-start-2"}`}
-          />
-          <button
-            type="submit"
-            aria-label="Send"
-            title={pendingReads ? "Reading attachments…" : "Send"}
-            disabled={!ready}
-            className={`primary-action col-start-3 grid size-6.5 place-items-center rounded-md transition-[background-color,color,transform] duration-150 active:scale-90 disabled:cursor-default ${stacked ? "row-start-2" : "row-start-1"}`}
-          >
-            <ArrowUp className="size-3.5" strokeWidth={2} />
-          </button>
-        </div>
+        ) : (
+          // Even padding centers send beside one line, and keeps it at the
+          // bottom as the text grows.
+          <div className="flex items-end gap-1.5 p-1.25">
+            {input("flex-1 self-center px-1.5")}
+            {sendButton("shrink-0")}
+          </div>
+        )}
       </div>
+      {inline ? null : (
+        <div className="flex min-w-0 items-center gap-2 px-1 pt-1">
+          {attachButton(
+            "flex h-6.5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12px] text-content/55 transition-colors hover:text-content disabled:opacity-50",
+            "Add",
+          )}
+          <div className="ml-auto flex min-w-0 items-center gap-1">
+            {controls}
+          </div>
+        </div>
+      )}
     </form>
   );
 }
