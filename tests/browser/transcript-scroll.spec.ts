@@ -11,10 +11,15 @@ type MonoScrollWindow = Window & {
 };
 
 type MonoCompletionWindow = Window & {
+  queueMonoCompletion: () => void;
   beginMonoCompletion: () => void;
   finishMonoCompletion: () => void;
   startCompletionSamples: () => void;
-  finishCompletionSamples: () => { cardTop: number; height: number }[];
+  finishCompletionSamples: () => {
+    cardTop: number;
+    height: number;
+    viewport: number;
+  }[];
 };
 
 for (const length of ["short", "scrolling"]) {
@@ -36,6 +41,7 @@ for (const length of ["short", "scrolling"]) {
       const read = () => ({
         cardTop: card.getBoundingClientRect().top,
         height: el.scrollHeight,
+        viewport: el.clientHeight,
       });
       let samples: ReturnType<typeof read>[] = [];
       let frame = 0;
@@ -54,8 +60,14 @@ for (const length of ["short", "scrolling"]) {
         },
       });
       (window as MonoCompletionWindow).startCompletionSamples();
-      (window as MonoCompletionWindow).beginMonoCompletion();
+      (window as MonoCompletionWindow).queueMonoCompletion();
     });
+    // Delivery can await provider preflight after queuing. Capture that
+    // intermediate paint too, before the hidden prompt reaches the Mono.
+    await page.waitForTimeout(120);
+    await page.evaluate(() =>
+      (window as MonoCompletionWindow).beginMonoCompletion(),
+    );
     await expect(card).toHaveAttribute("data-state", "done");
     // Let a temporary height correction complete; a final-position-only
     // assertion would miss the visible dip before the report is attached.
@@ -65,6 +77,10 @@ for (const length of ["short", "scrolling"]) {
     );
     const tops = reopened.map((sample) => sample.cardTop);
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
+    const viewports = reopened.map((sample) => sample.viewport);
+    expect(Math.max(...viewports) - Math.min(...viewports)).toBeLessThanOrEqual(
+      1,
+    );
 
     await page.evaluate(() => {
       (window as MonoCompletionWindow).startCompletionSamples();

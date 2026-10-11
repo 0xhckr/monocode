@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentTranscript } from "../../src/features/sessions/ui/AgentTranscript";
 import { MonoComposer } from "../../src/features/monos/ui/MonoComposer";
-import type { Block } from "../../src/features/sessions/model/session";
+import { MessageQueue } from "../../src/features/sessions/ui/MessageQueue";
+import { visibleMonoCompletionMessages } from "../../src/features/monos/model/monoMessaging";
+import {
+  newSession,
+  type Block,
+  type QueuedMessage,
+} from "../../src/features/sessions/model/session";
 import {
   saveTranscriptAnchor,
   saveTranscriptLayout,
@@ -157,11 +163,29 @@ function MonoCompletionFixture() {
     startedAt: start + 5000,
   };
   const [conversation, setConversation] = useState(original);
+  const [notifications, setNotifications] = useState<QueuedMessage[]>([]);
+  const [session] = useState(() => newSession("codex", "/repo"));
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<"working" | "done">("working");
   useEffect(() => {
     Object.assign(window, {
+      queueMonoCompletion: () => {
+        setNotifications([
+          {
+            id: completion.id,
+            text: completion.text,
+            attachments: [],
+            monoSessionCompletion: {
+              sessionId: launched.sessionId,
+              title: launched.title,
+              status: "completed",
+            },
+          },
+        ]);
+        setState("done");
+      },
       beginMonoCompletion: () => {
+        setNotifications([]);
         setConversation([...original, completion]);
         setBusy(true);
         setState("done");
@@ -197,6 +221,17 @@ function MonoCompletionFixture() {
           }
         />
       </div>
+      <MessageQueue
+        messages={visibleMonoCompletionMessages({
+          ...session,
+          blocks: conversation,
+          busy,
+          queuedMessages: notifications,
+          queueStatus: "active",
+        })}
+        variant="messages"
+        onResume={() => {}}
+      />
       <MonoComposer
         sessionId="completion-mono"
         name="Mono"

@@ -77,6 +77,7 @@ import { QuestionForm } from "./QuestionForm";
 import {
   monoMessageDeliveries,
   monoPendingTranscriptBlocks,
+  visibleMonoCompletionMessages,
 } from "../../monos/model/monoMessaging";
 import { MessageQueue } from "./MessageQueue";
 import { useMonoTranscript } from "../../monos/hooks/useMonoTranscript";
@@ -1146,9 +1147,7 @@ const LocalSessionPane = memo(function LocalSessionPane({
               {agent ? (
                 <>
                   <MessageQueue
-                    messages={(session.queuedMessages ?? []).filter(
-                      (message) => !!message.monoSessionCompletion,
-                    )}
+                    messages={visibleMonoCompletionMessages(session)}
                     status={session.queueStatus}
                     sendingId={session.sendingQueuedMessageId}
                     onDelete={(messageId) =>
