@@ -95,8 +95,11 @@ import { MonoDetails } from "../features/monos/ui/MonoDetails";
 import { MonoActivityPanel } from "../features/monos/ui/MonoActivityPanel";
 import { MonoSessionsPanel } from "../features/monos/ui/MonoSessionsPanel";
 import {
+  launchedSessionState,
   monoSpawnedSessions,
   recordMonoSpawnedSession,
+  type LaunchedSessionState,
+  type LaunchedSessionView,
 } from "../features/monos/model/monoSpawnedSessions";
 import { groupMonoTurns } from "../features/sessions/model/transcriptActivity";
 import {
@@ -1166,20 +1169,6 @@ function Workspace({
       setMonoChanges(null);
       setMonoSessions(null);
       setMonoActivity((previous) =>
-        previous?.sessionId === sessionId && previous.turnId === turnId
-          ? null
-          : { sessionId, turnId, blocks },
-      );
-    },
-    [],
-  );
-  const onShowMonoSessions = useCallback(
-    (sessionId: string, turnId: string, blocks: Block[]) => {
-      setMonoDetailsOpen(false);
-      setMonoArtifact(null);
-      setMonoChanges(null);
-      setMonoActivity(null);
-      setMonoSessions((previous) =>
         previous?.sessionId === sessionId && previous.turnId === turnId
           ? null
           : { sessionId, turnId, blocks },
@@ -4056,6 +4045,14 @@ function Workspace({
         setComposerFocused(true);
         return;
       }
+      // Over the Mono, only its sidebar holds panes outside the workspace: a
+      // launched session sliding away as another opens. Its late focus must
+      // not close the Mono and send that session to its project.
+      if (
+        monoViewIdRef.current &&
+        !tabsRef.current.some((tab) => leafIds(tab.layout).includes(paneId))
+      )
+        return;
       closeMonoView();
       if (
         tabsRef.current.find((tab) => tab.id === activeTabIdRef.current)
@@ -4877,6 +4874,38 @@ function Workspace({
       const session = await ensureOpenSession(sessionId);
       if (!session) throw new Error("This session is no longer available.");
       setMonoShownSession({ from, sessionId });
+      setMonoShownSessionFocused(true);
+      setProjectTerminalFocused(false);
+      setComposerFocused(true);
+    },
+    [ensureOpenSession],
+  );
+  // A card in the Mono's chat opens its session straight in the sidebar, with
+  // the turn's list behind it to go back to; the open card's click closes it.
+  const onOpenMonoSession = useCallback(
+    async (
+      monoSessionId: string,
+      turnId: string,
+      blocks: Block[],
+      launchedId: string,
+    ) => {
+      if (shownMonoSessionIdRef.current === launchedId) {
+        setMonoSessions(null);
+        return;
+      }
+      const from = { sessionId: monoSessionId, turnId, blocks };
+      // Load it first, then switch in one step: the sidebar goes straight
+      // from the session it shows to this one, never through the list.
+      const session = await ensureOpenSession(launchedId).catch(() => null);
+      if (monoViewIdRef.current !== monoSessionId) return;
+      setMonoDetailsOpen(false);
+      setMonoArtifact(null);
+      setMonoChanges(null);
+      setMonoActivity(null);
+      setMonoSessions(from);
+      // One that is gone leaves the list open, which says so.
+      if (!session) return;
+      setMonoShownSession({ from, sessionId: launchedId });
       setMonoShownSessionFocused(true);
       setProjectTerminalFocused(false);
       setComposerFocused(true);
@@ -12477,6 +12506,73 @@ function Workspace({
         windowControls={monoCovers && !IS_MAC ? <WindowControls /> : undefined}
       />
     ) : null;
+  // Status for the cards of the sessions the open Mono launched, rebuilt only
+  // when one changes state or title rather than on every streamed token. One
+  // that is no longer open cannot be running, so it reads as done.
+  const monoViewBlocks = monoViewSession?.blocks;
+  const monoLaunches = useMemo(
+    () => (monoViewBlocks ? monoSpawnedSessions(monoViewBlocks) : []),
+    [monoViewBlocks],
+  );
+  // A card names its session as the sidebar does. One that is not open has
+  // its saved title fetched, rather than the prompt it was launched with, so
+  // opening it does not rename the card.
+  const [storedLaunchTitles, setStoredLaunchTitles] = useState<
+    ReadonlyMap<string, string>
+  >(() => new Map());
+  const unopenedLaunchesKey = JSON.stringify(
+    monoLaunches.flatMap((launch) =>
+      storedLaunchTitles.has(launch.sessionId) ||
+      sessions.some((entry) => entry.id === launch.sessionId)
+        ? []
+        : [launch.sessionId],
+    ),
+  );
+  useEffect(() => {
+    const ids: string[] = JSON.parse(unopenedLaunchesKey);
+    if (ids.length === 0) return;
+    let current = true;
+    void Promise.all(ids.map((id) => getSession(id).catch(() => null))).then(
+      (stored) => {
+        if (!current) return;
+        setStoredLaunchTitles((previous) => {
+          const next = new Map(previous);
+          stored.forEach((session, index) =>
+            next.set(ids[index], session?.title ?? ""),
+          );
+          return next;
+        });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [unopenedLaunchesKey]);
+  const monoLaunchesKey = JSON.stringify(
+    monoLaunches.map((launch) => {
+      const live = sessions.find((entry) => entry.id === launch.sessionId);
+      return live
+        ? [launch.sessionId, launchedSessionState(live), live.title]
+        : [
+            launch.sessionId,
+            "done",
+            storedLaunchTitles.get(launch.sessionId) || launch.title,
+          ];
+    }),
+  );
+  const monoLaunchedSessions = useMemo(
+    () =>
+      new Map<string, LaunchedSessionView>(
+        (
+          JSON.parse(monoLaunchesKey) as [
+            string,
+            LaunchedSessionState,
+            string,
+          ][]
+        ).map(([id, state, title]) => [id, { state, title }]),
+      ),
+    [monoLaunchesKey],
+  );
   const monoShownSessionPane = shownMonoSessionId
     ? sessions.find((session) => session.id === shownMonoSessionId)
     : undefined;
@@ -12998,10 +13094,13 @@ function Workspace({
                                       monoActivityTurnId={
                                         selectedMonoActivity?.turnId
                                       }
-                                      onShowMonoSessions={onShowMonoSessions}
-                                      monoSessionsTurnId={
-                                        selectedMonoSessions?.turnId
+                                      onOpenMonoSession={onOpenMonoSession}
+                                      monoLaunchedSessions={
+                                        visible
+                                          ? monoLaunchedSessions
+                                          : undefined
                                       }
+                                      openMonoSessionId={shownMonoSessionId}
                                     />
                                   </div>
                                 );

@@ -2,6 +2,8 @@ import { unwrapShellCommand } from "../../../integrations/harness/core/shellInte
 import { monoCodeToolCall } from "../../sessions/model/monocodeToolCall";
 import {
   HARNESSES,
+  sessionDraftBlock,
+  sessionNeedsInput,
   type Block,
   type MonoSpawnedSession,
   type Session,
@@ -128,4 +130,23 @@ export function monoSpawnedSessions(
     }
   }
   return [...found.values()];
+}
+
+/** Where a launched session stands, for its card in the Mono's chat. */
+export type LaunchedSessionState =
+  "working" | "input" | "draft" | "failed" | "stopped" | "done";
+
+export type LaunchedSessionView = {
+  state: LaunchedSessionState;
+  title: string;
+};
+
+export function launchedSessionState(session: Session): LaunchedSessionState {
+  if (sessionNeedsInput(session)) return "input";
+  if (session.busy) return "working";
+  if (sessionDraftBlock(session)) return "draft";
+  const notice = session.blocks[session.blocks.length - 1]?.notice;
+  if (notice === "error") return "failed";
+  if (notice === "interrupt") return "stopped";
+  return "done";
 }

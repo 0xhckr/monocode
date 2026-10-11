@@ -5,6 +5,7 @@ import {
   type MonoSpawnedSession,
 } from "../../sessions/model/session";
 import {
+  launchedSessionState,
   monoSpawnedSessions,
   recordMonoSpawnedSession,
   sanitizeMonoSpawnedSessions,
@@ -98,4 +99,35 @@ it("sanitizes saved references and strips extra fields", () => {
     ]),
   ).toEqual([{ ...launch, title: "Review" }]);
   expect(sanitizeMonoSpawnedSessions({})).toEqual([]);
+});
+
+it("reads a launched session's state for its card", () => {
+  const session = newSession("codex", "/repo");
+  const ran = (blocks: Block[], extra = {}) =>
+    launchedSessionState({ ...session, blocks, ...extra });
+  const prompt: Block = { id: "u", role: "user", text: "Fix it" };
+  expect(ran([prompt], { busy: true })).toBe("working");
+  // Waiting on the user outranks working, so the card asks for attention.
+  expect(
+    ran(
+      [
+        prompt,
+        { id: "a", role: "tool", text: "rm", approval: { requestId: 1 } },
+      ],
+      { busy: true },
+    ),
+  ).toBe("input");
+  expect(ran([{ ...prompt, draft: true }])).toBe("draft");
+  expect(
+    ran([prompt, { id: "e", role: "system", text: "Boom", notice: "error" }]),
+  ).toBe("failed");
+  expect(
+    ran([
+      prompt,
+      { id: "i", role: "system", text: "Stopped", notice: "interrupt" },
+    ]),
+  ).toBe("stopped");
+  expect(ran([prompt, { id: "r", role: "assistant", text: "Done." }])).toBe(
+    "done",
+  );
 });

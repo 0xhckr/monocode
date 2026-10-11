@@ -1345,6 +1345,11 @@ html.has-user-accent .user-message-bubble[data-draft="true"] {
   > :is([data-artifact-results], [data-turn-actions]) {
   display: none;
 }
+/* Session cards wait for the reply above them to finish its reveal; cards
+   above a later reply, such as a report back, stay where they are. */
+.transcript-turn > :has(.word-fading) ~ [data-launched-sessions] {
+  display: none;
+}
 
 /* While a sent prompt rises into place, the rest of its turn waits for it. */
 .transcript-turn[data-prompt-rise="rising"] > :not(:has([data-prompt-anchor])) {
@@ -2803,6 +2808,46 @@ html.theme-light .mono-pill {
 
 .zen-phase-body > .zen-phase-live::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * Soft edges like the Mono transcript's, but only on a side with more to
+ * scroll to: a window resting at the top has nothing above it to fade into.
+ * The lengths are registered so an edge eases in and out instead of popping.
+ */
+@property --zen-phase-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --zen-phase-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.zen-phase-body[data-open="true"] > .zen-phase-live {
+  --zen-phase-mask: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--zen-phase-fade-top),
+    #000 calc(100% - var(--zen-phase-fade-bottom)),
+    transparent
+  );
+  -webkit-mask-image: var(--zen-phase-mask);
+  mask-image: var(--zen-phase-mask);
+  transition:
+    --zen-phase-fade-top 160ms ease-out,
+    --zen-phase-fade-bottom 160ms ease-out;
+}
+
+.zen-phase-live[data-fade-top="true"] {
+  --zen-phase-fade-top: 1.5rem;
+}
+
+.zen-phase-live[data-fade-bottom="true"] {
+  --zen-phase-fade-bottom: 2rem;
 }
 
 /*
