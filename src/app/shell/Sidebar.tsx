@@ -3217,7 +3217,7 @@ function SessionListItem({
   return <li ref={ref}>{children}</li>;
 }
 
-const SessionCard = memo(function SessionCard({
+export const SessionCard = memo(function SessionCard({
   session,
   isActive,
   isSelected,
@@ -3227,6 +3227,7 @@ const SessionCard = memo(function SessionCard({
   needsApproval,
   dropTarget,
   compact = false,
+  project,
   now,
   onSelect,
   onOpenWorkItem,
@@ -3248,6 +3249,8 @@ const SessionCard = memo(function SessionCard({
   needsApproval: boolean;
   dropTarget?: boolean;
   compact?: boolean;
+  /** Names its project before the branch, where sessions span several. */
+  project?: string;
   now: number;
   onSelect: (
     sessionId: string,
@@ -3640,13 +3643,23 @@ const SessionCard = memo(function SessionCard({
           />
         ) : null}
         <span className="relative mt-1 flex items-center gap-2">
-          {gitLabel ? (
+          {project && !gitLabel ? (
+            <span
+              className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45"
+              title={session.cwd}
+            >
+              <Folder className="size-3 shrink-0" strokeWidth={1.75} />
+              <span className="min-w-0 truncate">{project}</span>
+            </span>
+          ) : gitLabel ? (
             <span
               className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45"
               title={session.worktreeCwd ? `${gitLabel}\n${session.worktreeCwd}` : gitLabel}
             >
               <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="min-w-0 truncate">{gitLabel}</span>
+              <span className="min-w-0 truncate">
+                {project ? `${project} · ${gitLabel}` : gitLabel}
+              </span>
             </span>
           ) : (
             <span className="min-w-0 flex-1" />

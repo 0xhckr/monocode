@@ -118,7 +118,7 @@ it("opens on General and moves between its sections", async () => {
     ["General", "Soul", "Memory"],
   );
   expect(button("General", nav).getAttribute("aria-current")).toBe("page");
-  expect(dialog().textContent).toContain("Name and icon");
+  expect(dialog().querySelector("input[aria-label=\"Name\"]")).not.toBeNull();
   expect(dialog().textContent).toContain("Permissions");
   await act(async () => button("Memory", nav).click());
   expect(button("Memory", nav).getAttribute("aria-current")).toBe("page");

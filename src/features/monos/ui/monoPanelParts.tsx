@@ -27,28 +27,35 @@ import {
   type MonoFile,
 } from "../model/monoFiles";
 
-/** The top of a page in the Mono's panel: back, a title, and its actions. */
+/**
+ * The top of a page in the Mono's panel: back, a title, and its actions.
+ * Without `onBack` it heads a section of the settings dialog instead.
+ */
 export function PageHeader({
   title,
   onBack,
   children,
 }: {
   title: ReactNode;
-  onBack: () => void;
+  onBack?: () => void;
   children?: ReactNode;
 }) {
   return (
     // Same height as the panel's own header, so a page does not jump.
     <header
-      className="flex h-10 shrink-0 items-center gap-1 border-b border-stroke pl-2"
+      className={`flex h-10 shrink-0 items-center gap-1 border-b border-stroke ${
+        onBack ? "pl-2" : "pl-4"
+      }`}
       style={{
         paddingRight: "calc(0.75rem + var(--mono-window-controls-width, 0px))",
       }}
       data-tauri-drag-region="deep"
     >
-      <IconButton label="Back" onClick={onBack}>
-        <ChevronLeft className="size-3.5" strokeWidth={1.75} />
-      </IconButton>
+      {onBack ? (
+        <IconButton label="Back" onClick={onBack}>
+          <ChevronLeft className="size-3.5" strokeWidth={1.75} />
+        </IconButton>
+      ) : null}
       <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-content">
         {title}
       </h3>
