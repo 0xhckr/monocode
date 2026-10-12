@@ -41,7 +41,7 @@ export type Mono = {
   color: string;
   /** Project folders it works on, in the order they were added. */
   projects: string[];
-  /** New sessions appear in the project sidebar unless explicitly disabled. */
+  /** New sessions stay out of the project sidebar unless turned on. */
   showStartedSessionsInSidebar?: boolean;
   /** Files the sessions it starts into a sidebar folder named after it. */
   useSidebarFolders?: boolean;

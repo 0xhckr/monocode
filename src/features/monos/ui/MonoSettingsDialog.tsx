@@ -147,7 +147,7 @@ function GeneralSection({
   const lock = useLockOverscroll<HTMLDivElement>();
   const shown = useSyncExternalStore(
     subscribeMonos,
-    () => findMono(monoId)?.showStartedSessionsInSidebar !== false,
+    () => findMono(monoId)?.showStartedSessionsInSidebar === true,
   );
   const folders = useSyncExternalStore(
     subscribeMonos,

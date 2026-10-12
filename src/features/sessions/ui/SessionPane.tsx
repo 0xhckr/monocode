@@ -1208,7 +1208,7 @@ const LocalSessionPane = memo(function LocalSessionPane({
                     // which a Mono in full view covers. Its account moves
                     // with the usage-limit notice, not here.
                     tools={
-                      <div className="flex shrink-0 items-center gap-1.5 pl-1.5 text-[11px] text-content/55">
+                      <div className="flex shrink-0 items-center gap-0.5 text-[11px] text-content/55">
                         <UsageChips
                           providers={monoUsageProviders(session.harness)}
                           session={{
@@ -1219,6 +1219,7 @@ const LocalSessionPane = memo(function LocalSessionPane({
                           }}
                           project={session.cwd}
                           accountPicker={false}
+                          variant="composer"
                         />
                       </div>
                     }

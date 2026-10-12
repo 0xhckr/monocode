@@ -34,7 +34,11 @@ import {
   type RunningTerminal,
 } from "../../features/terminal/model/terminalTab";
 import { MOD } from "../../platform/tauri/platform";
-import { UsageProviderChip } from "./UsageProviderChip";
+import {
+  USAGE_REFRESH_CLASSES,
+  UsageProviderChip,
+  type UsageChipVariant,
+} from "./UsageProviderChip";
 import { PiUsage } from "./PiUsage";
 import {
   ProviderSignInPanel,
@@ -122,7 +126,10 @@ export function UsageFooter({
         onManageAccounts={onManageAccounts}
         fallback={
           session ? (
-            <SessionChip key={session.id ?? session.harness} session={session} />
+            <SessionChip
+              key={session.id ?? session.harness}
+              session={session}
+            />
           ) : null
         }
       />
@@ -161,7 +168,8 @@ export function UsageFooter({
  * The provider usage chips and their refresh button, for the session footer
  * and anywhere else a conversation shows how much of its plan is left.
  * `accountPicker` off keeps the chips to usage alone, for a conversation
- * whose account is not switched from here.
+ * whose account is not switched from here. `variant` `composer` matches
+ * the tool buttons under a Mono's composer instead of the footer.
  */
 export function UsageChips({
   providers,
@@ -171,6 +179,7 @@ export function UsageChips({
   onManageAccounts,
   accountPicker = true,
   fallback = null,
+  variant = "footer",
 }: {
   providers: RateLimitProvider[];
   session?: UsageFooterSession;
@@ -183,6 +192,7 @@ export function UsageChips({
   accountPicker?: boolean;
   /** Shown when there is no usage to show. */
   fallback?: ReactNode;
+  variant?: UsageChipVariant;
 }) {
   const wantClaude = providers.includes("claude");
   const wantCodex = providers.includes("codex");
@@ -434,6 +444,7 @@ export function UsageChips({
         key={`${session.id}:${session.model}`}
         model={session.model}
         now={now}
+        variant={variant}
       />
     );
   }
@@ -444,6 +455,7 @@ export function UsageChips({
         <UsageProviderChip
           limits={claude}
           now={now}
+          variant={variant}
           {...claudeAccountProps}
           onReconnect={reconnectClaude}
         />
@@ -453,13 +465,19 @@ export function UsageChips({
           limits={codex}
           now={now}
           project={project}
+          variant={variant}
           {...codexAccountProps}
           onConsumeReset={consumeCodexReset}
           onReconnect={reconnectCodex}
         />
       ) : null}
       {showOpencodeChip ? (
-        <UsageProviderChip limits={opencode} now={now} project={project} />
+        <UsageProviderChip
+          limits={opencode}
+          now={now}
+          project={project}
+          variant={variant}
+        />
       ) : null}
       {wantDevin ? (
         // Devin has one login per machine, so there is no account picker.
@@ -467,12 +485,13 @@ export function UsageChips({
           limits={devin}
           now={now}
           project={project}
+          variant={variant}
           onReconnect={reconnectDevin}
         />
       ) : null}
       <button
         type="button"
-        className="grid size-4.5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content disabled:opacity-50"
+        className={USAGE_REFRESH_CLASSES[variant]}
         aria-label="Refresh usage"
         title="Refresh usage"
         disabled={refreshing}

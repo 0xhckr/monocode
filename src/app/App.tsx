@@ -1099,7 +1099,8 @@ function Workspace({
     () => windowTransfer?.activeTabId ?? resumed?.activeTabId ?? seed.tab.id,
   );
   const [monoViewId, setMonoViewId] = useState<string | null>(null);
-  const [monoOverviewOpen, setMonoOverviewOpen] = useState(false);
+  // A Mono opens with its overview beside the chat until it is hidden.
+  const [monoOverviewOpen, setMonoOverviewOpen] = useState(true);
   const [monoOverviewTab, setMonoOverviewTab] =
     useState<MonoOverviewTab>("sessions");
   // The Mono whose settings dialog is open; another Mono's view closes it.

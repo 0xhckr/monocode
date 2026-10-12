@@ -468,7 +468,7 @@ function startLaunch(
   return {
     cwd,
     prompt,
-    ...(host.monoOf?.(source.id)?.showStartedSessionsInSidebar === false
+    ...(host.monoOf?.(source.id)?.showStartedSessionsInSidebar !== true
       ? { sidebarHidden: true }
       : {}),
     ...(draft ? { draft: true } : {}),
