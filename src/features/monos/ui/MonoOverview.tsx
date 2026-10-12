@@ -19,6 +19,7 @@ import { HabitPage } from "./HabitPage";
 import { NewHabitPage } from "./NewHabitPage";
 import { habitActions, HabitsList, useHabits } from "./MonoHabits";
 import { ArtifactReader } from "../../artifacts/ui/ArtifactPanel";
+import { ArtifactIcon } from "../../artifacts/ui/ArtifactCard";
 import {
   LaunchedSessionPage,
   MonoSessionList,
@@ -512,7 +513,7 @@ function DocumentRow({
         aria-hidden
         className="grid size-7 shrink-0 place-items-center rounded-md bg-content/6 text-content/60"
       >
-        <File className="size-3.5" strokeWidth={1.75} />
+        <ArtifactIcon kind={card.kind} className="size-3.5" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[12px] leading-5 text-content/85">

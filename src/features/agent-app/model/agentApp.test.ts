@@ -1369,6 +1369,34 @@ describe("agent app commands", () => {
     ).resolves.toMatchObject({ body: note.body });
   });
 
+  it("saves an html visual with its kind and posts it to the reply", async () => {
+    const { source, host } = fixture();
+    host.isMono = () => true;
+    host.artifact = vi.fn(async () => null);
+    host.saveArtifact = vi.fn(async (artifact) => ({
+      ...artifact,
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    host.postArtifact = vi.fn();
+    await expect(
+      handleAgentApp(
+        source,
+        "visual",
+        "artifacts.write",
+        { kind: "html", title: "Build times", body: "<div>chart</div>" },
+        host,
+      ),
+    ).resolves.toMatchObject({ kind: "html", title: "Build times" });
+    expect(host.saveArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "html", body: "<div>chart</div>" }),
+    );
+    expect(host.postArtifact).toHaveBeenCalledWith(
+      source.id,
+      expect.objectContaining({ kind: "html" }),
+    );
+  });
+
   it("rejects unsupported artifact kinds before saving or posting a card", async () => {
     const { source, host } = fixture();
     host.isMono = () => true;

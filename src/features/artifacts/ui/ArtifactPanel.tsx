@@ -110,14 +110,6 @@ export function ArtifactReader({
           </p>
         ) : (
           <article data-artifact-reader={artifact.id}>
-            <div className="mb-6">
-              <h1 className="text-[22px] font-medium leading-snug text-content">
-                {artifact.title}
-              </h1>
-              <p className="mt-2 text-[11px] text-content/45">
-                Updated {new Date(artifact.updatedAt).toLocaleString()}
-              </p>
-            </div>
             <ArtifactContent artifact={artifact} onOpenFile={onOpenFile} />
             {error ? (
               <p role="alert" className="mt-3 text-[12px] text-content/60">
