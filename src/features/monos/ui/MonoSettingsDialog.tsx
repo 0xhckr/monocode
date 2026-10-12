@@ -160,21 +160,10 @@ function GeneralSection({
     >
       <h3 className="text-[14px] font-medium text-content">General</h3>
 
-      <div className="flex flex-col items-center gap-2 pb-6 pt-4">
+      <div className="flex flex-col items-center pb-6 pt-4">
         <LookButton monoId={monoId} agent={agent} />
-        <span className="text-[11px] text-content/40">
-          Click to change its mascot and color
-        </span>
+        <NameField key={monoId} monoId={monoId} fallback={agent.mascot} />
       </div>
-
-      <SettingGroup>
-        <SettingRow
-          label="Name"
-          description="What it goes by on the rail and in its chat."
-        >
-          <NameField key={monoId} monoId={monoId} fallback={agent.mascot} />
-        </SettingRow>
-      </SettingGroup>
 
       <GroupHeading title="Model" />
       <SettingGroup>
@@ -442,7 +431,7 @@ function NameField({ monoId, fallback }: { monoId: string; fallback: string }) {
           event.currentTarget.blur();
         }
       }}
-      className="h-8 w-full rounded-lg border border-stroke bg-content/3 px-2.5 text-[13px] text-content outline-none placeholder:text-content/45 focus:border-content/25"
+      className="mt-3 h-8 w-full max-w-64 rounded-md bg-transparent px-2 text-center text-[15px] font-medium text-content outline-none placeholder:text-content/60 hover:bg-content/5 focus:bg-content/5"
     />
   );
 }

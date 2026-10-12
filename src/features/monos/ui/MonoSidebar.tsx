@@ -23,14 +23,13 @@ export function MonoSidebar({
   windowControls?: ReactNode;
   children: ReactNode;
 }) {
-  // Readers (documents, diffs) need room; the turn sidebars stay narrow.
+  // Readers (documents, diffs) open wide; the others start narrow.
   const reader = kind === "artifact" || kind === "changes";
   const resize = useDragResize({
     min: reader ? 360 : MIN_WIDTH,
-    max: () =>
-      reader
-        ? Math.min(840, Math.round(window.innerWidth * 0.58))
-        : Math.min(440, Math.round(window.innerWidth * 0.4)),
+    // The overview hosts whole sessions and documents now, so it may grow
+    // as wide as a reader; either way the chat keeps a good share.
+    max: () => Math.min(960, Math.round(window.innerWidth * 0.62)),
     defaultWidth: reader ? 560 : MIN_WIDTH,
     initial: reader ? rememberedArtifactWidth : rememberedWidth,
     direction: "left",
