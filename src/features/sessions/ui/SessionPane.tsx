@@ -72,6 +72,8 @@ import { MonoComposer } from "../../monos/ui/MonoComposer";
 import type { LaunchedSessionView } from "../../monos/model/monoSpawnedSessions";
 import { ModelControlPills, ModelPicker } from "./ModelPicker";
 import { ContextMeter } from "./ContextMeter";
+import { UsageChips } from "../../../app/shell/UsageFooter";
+import type { RateLimitProvider } from "../../providers/model/rateLimits";
 import { MonoUsageLimitNotice } from "../../monos/ui/MonoUsageLimitNotice";
 import { QuestionForm } from "./QuestionForm";
 import {
@@ -1202,6 +1204,24 @@ const LocalSessionPane = memo(function LocalSessionPane({
                     onSubmit={(text, attachments) =>
                       onSubmit(session.id, text, attachments)
                     }
+                    // The plan's usage, as the session footer shows it,
+                    // which a Mono in full view covers. Its account moves
+                    // with the usage-limit notice, not here.
+                    tools={
+                      <div className="flex shrink-0 items-center gap-1.5 pl-1.5 text-[11px] text-content/55">
+                        <UsageChips
+                          providers={monoUsageProviders(session.harness)}
+                          session={{
+                            id: session.id,
+                            harness: session.harness,
+                            model: session.model,
+                            providerAccountId: session.providerAccountId,
+                          }}
+                          project={session.cwd}
+                          accountPicker={false}
+                        />
+                      </div>
+                    }
                     controls={
                       <>
                         <ModelPicker
@@ -1262,3 +1282,13 @@ const LocalSessionPane = memo(function LocalSessionPane({
     </div>
   );
 });
+
+/** The providers whose plan usage a Mono on `harness` shows by its composer. */
+function monoUsageProviders(harness: HarnessId): RateLimitProvider[] {
+  return harness === "claude" ||
+    harness === "codex" ||
+    harness === "opencode" ||
+    harness === "devin"
+    ? [harness]
+    : [];
+}

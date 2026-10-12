@@ -68,6 +68,8 @@ type Props = {
    * line, as in the floating chat.
    */
   controls?: ReactNode;
+  /** Sits beside attach and emoji, on the left under the input. */
+  tools?: ReactNode;
 };
 
 /**
@@ -88,6 +90,7 @@ export function MonoComposer({
   onSubmit,
   onFocus,
   controls,
+  tools,
 }: Props) {
   const [text, setText] = useState(() => getComposerDraft(sessionId) ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -468,6 +471,7 @@ export function MonoComposer({
               />
             </Suspense>
           ) : null}
+          {tools}
           <div className="ml-auto flex min-w-0 items-center gap-1">
             {controls}
           </div>
