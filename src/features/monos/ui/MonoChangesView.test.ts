@@ -7,9 +7,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ ask: vi.fn(async () => true) }));
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(async () => {}),
 }));
-vi.mock("../../source-control/ui/SessionChangesDiff", () => ({
-  SessionChangesDiff: () => null,
-}));
 vi.mock("../../../platform/tauri/fs", () => ({
   gitLocateFiles: vi.fn(),
   gitDiffIndex: vi.fn(),
@@ -19,7 +16,10 @@ vi.mock("../../../platform/tauri/fs", () => ({
   gitPush: vi.fn(async () => {}),
   gitSync: vi.fn(async () => {}),
   gitPrCreate: vi.fn(),
-  gitStageFile: vi.fn(),
+  gitStageFile: vi.fn(async () => {}),
+  gitUnstageFile: vi.fn(async () => {}),
+  gitStageAll: vi.fn(async () => {}),
+  gitUnstageAll: vi.fn(async () => {}),
   gitDiscardFile: vi.fn(),
   notifyGitChanged: vi.fn(),
   subscribeGitChanged: () => () => {},
@@ -42,6 +42,13 @@ vi.mock("../../sessions/model/checkpoint", () => ({
   subscribeReviewChanged: () => () => {},
 }));
 
+vi.mock("../../source-control/model/worktrees", () => ({
+  listWorktrees: vi.fn(async (cwd: string) => ({
+    defaultRoot: "",
+    worktrees: [{ path: cwd.replace(/-wt$/, ""), isMain: true }],
+  })),
+}));
+
 import { MonoChangesView } from "./MonoChangesView";
 import {
   gitCommit,
@@ -50,6 +57,7 @@ import {
   gitPush,
   gitStageFile,
   type GitDiffIndex,
+  type GitFileLocation,
 } from "../../../platform/tauri/fs";
 import { generateCommitMessage } from "../../../integrations/harness";
 import {
@@ -57,11 +65,23 @@ import {
   sessionCheckpointStatus,
 } from "../../sessions/model/checkpoint";
 
+/** Locate the attached projects' folders, then the session's files. */
+function locateAs(
+  files: (GitFileLocation | null)[],
+  attached: (GitFileLocation | null)[] = [],
+) {
+  vi.mocked(gitLocateFiles).mockResolvedValue([...attached, ...files]);
+}
+
 let container: HTMLDivElement;
 let root: Root;
+// The view caches each session's projects, so every test is its own session.
+let sessionCount = 0;
+let session = "mono";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  session = `mono-${++sessionCount}`;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal(
     "ResizeObserver",
@@ -92,7 +112,7 @@ beforeEach(() => {
       undoable: true,
     })),
   });
-  vi.mocked(gitLocateFiles).mockResolvedValue(
+  locateAs(
     paths.map((path) =>
       path.includes("/")
         ? {
@@ -125,8 +145,8 @@ beforeEach(() => {
           status: "modified",
           additions: 1,
           deletions: 0,
-          staged: relative === "other.txt",
-          unstaged: relative !== "other.txt",
+          staged: relative === "other.txt" || (cwd.endsWith("/b") && relative === "same.txt"),
+          unstaged: !(relative === "other.txt" || (cwd.endsWith("/b") && relative === "same.txt")),
         })),
       }) satisfies GitDiffIndex,
   );
@@ -139,13 +159,15 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function render() {
+async function render(attachedProjects: string[] = []) {
   await act(async () =>
     root.render(
       createElement(MonoChangesView, {
-        sessionId: "mono",
+        sessionId: session,
         cwd: "/home",
         request: {},
+        agentName: "Mono",
+        attachedProjects,
       }),
     ),
   );
@@ -180,21 +202,16 @@ async function message(value: string) {
   });
 }
 
-it("preserves repo drafts and selections and commits and pushes only the chosen repo", async () => {
+it("preserves repo drafts and stages, commits and pushes only in the chosen repo", async () => {
   await render();
   await message("Draft A");
   const extra = active().querySelector('[title="extra.txt"]')!.closest("li")!;
-  await click(extra.querySelector('[title="Unstage Changes"]'));
+  await click(extra.querySelector('[title="Stage Changes"]'));
+  expect(gitStageFile).toHaveBeenCalledExactlyOnceWith("/home/a", "extra.txt");
   await switchRepo("b");
   await message("Draft B");
   await switchRepo("a");
   expect(active().querySelector("textarea")!.value).toBe("Draft A");
-  expect(
-    active()
-      .querySelector('[title="extra.txt"]')!
-      .closest("li")!
-      .querySelector('[title="Stage Changes"]'),
-  ).not.toBeNull();
   await switchRepo("b");
   expect(active().querySelector("textarea")!.value).toBe("Draft B");
   await click(active().querySelector('[aria-label="Commit options"]'));
@@ -203,24 +220,41 @@ it("preserves repo drafts and selections and commits and pushes only the chosen 
       active().querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
     ).find((button) => button.textContent === "Commit & Push")!,
   );
-  expect(gitCommit).toHaveBeenCalledExactlyOnceWith(
-    "/home/b",
-    "Draft B",
-    false,
-    ["same.txt"],
-  );
+  expect(gitCommit).toHaveBeenCalledExactlyOnceWith("/home/b", "Draft B", false);
   expect(keepSessionChanges).toHaveBeenCalledExactlyOnceWith(
-    "mono",
+    session,
     "/home",
     "b/same.txt",
   );
   expect(gitPush).toHaveBeenCalledExactlyOnceWith("/home/b");
-  expect(gitStageFile).not.toHaveBeenCalled();
   await switchRepo("a");
   expect(active().querySelector("textarea")!.value).toBe("Draft A");
 });
 
-it("generates from only the active repo selection without staging files", async () => {
+it("lists the Git index's staged and unstaged files", async () => {
+  await render();
+  const sections = [...active().querySelectorAll("li")].map((item) =>
+    item.querySelector("[title]")?.getAttribute("title"),
+  );
+  expect(sections).toEqual(
+    expect.arrayContaining(["other.txt", "same.txt", "extra.txt"]),
+  );
+  expect(active().textContent).toContain("Staged Changes");
+  expect(
+    active()
+      .querySelector('[title="other.txt"]')!
+      .closest("li")!
+      .querySelector('[title="Unstage Changes"]'),
+  ).not.toBeNull();
+  expect(
+    active()
+      .querySelector('[title="same.txt"]')!
+      .closest("li")!
+      .querySelector('[title="Stage Changes"]'),
+  ).not.toBeNull();
+});
+
+it("generates from the active repo's staged changes", async () => {
   await render();
   await switchRepo("b");
   await click(active().querySelector('[aria-label="Generate commit message"]'));
@@ -228,9 +262,7 @@ it("generates from only the active repo selection without staging files", async 
     "/home/b",
     undefined,
     expect.any(AbortSignal),
-    ["same.txt"],
   );
-  expect(gitStageFile).not.toHaveBeenCalled();
   expect(gitCommit).not.toHaveBeenCalled();
   expect(active().querySelector("textarea")!.value).toBe("Generated message");
   await switchRepo("a");
@@ -268,4 +300,91 @@ it("shows repository discovery failures", async () => {
     "Discovery failed",
   );
   expect(gitCommit).not.toHaveBeenCalled();
+});
+
+it("groups a worktree under its project and switches checkouts from the chevron", async () => {
+  const paths = ["a/one.txt", "a-wt/two.txt", "a-wt/three.txt"];
+  vi.mocked(sessionCheckpointStatus).mockResolvedValue({
+    files: paths.map((relative) => ({
+      path: `/home/${relative}`,
+      relative,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      exact: true,
+      undoable: true,
+    })),
+  });
+  locateAs(
+    paths.map((path) => ({
+      root: `/home/${path.split("/")[0]}`,
+      relative: path.split("/")[1],
+    })),
+  );
+  await render();
+  const tabs = [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="Projects"] [role="tab"]',
+    ),
+  ];
+  expect(tabs.map((tab) => tab.getAttribute("data-mono-project"))).toEqual([
+    "/home/a",
+  ]);
+  expect(tabs[0].textContent).toContain("3");
+  await click(container.querySelector('[role="tablist"] [aria-haspopup="listbox"]'));
+  const options = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+  ];
+  expect(options.map((option) => option.title)).toEqual([
+    "/home/a",
+    "/home/a-wt",
+  ]);
+  await click(options[1]);
+  expect(
+    active().querySelector("[data-mono-commit]")!.getAttribute("data-mono-commit"),
+  ).toBe("/home/a-wt");
+});
+
+it("reopens a session on its cached changes while they refresh", async () => {
+  await render();
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  vi.mocked(sessionCheckpointStatus).mockReturnValue(new Promise(() => {}));
+  vi.mocked(gitDiffIndex).mockReturnValue(new Promise(() => {}));
+  await render();
+  expect(
+    [...container.querySelectorAll('[role="tab"]')].map((tab) =>
+      tab.getAttribute("data-mono-project"),
+    ),
+  ).toEqual(["/home/a", "/home/b"]);
+  expect(active().querySelector('[title="extra.txt"]')).not.toBeNull();
+});
+
+it("offers the Mono's projects before the work changes anything", async () => {
+  vi.mocked(sessionCheckpointStatus).mockResolvedValue({ files: [] });
+  locateAs(
+    [],
+    [{ root: "/home/a", relative: ".monocode-probe" }, null],
+  );
+  await render(["/home/a", "/home/not-git"]);
+  expect(
+    [...container.querySelectorAll('[role="tab"]')].map((tab) =>
+      tab.getAttribute("data-mono-project"),
+    ),
+  ).toEqual(["/home/a"]);
+  expect(
+    active().querySelector("[data-mono-commit]")!.getAttribute("data-mono-commit"),
+  ).toBe("/home/a");
+  expect(active().querySelector("textarea")).not.toBeNull();
+});
+
+it("shows an empty state when the Mono has no projects", async () => {
+  vi.mocked(sessionCheckpointStatus).mockResolvedValue({ files: [] });
+  locateAs([]);
+  await render();
+  expect(container.querySelector("textarea")).toBeNull();
+  expect(container.textContent).toContain(
+    "Give Mono a project to work on",
+  );
+  expect(gitDiffIndex).not.toHaveBeenCalled();
 });

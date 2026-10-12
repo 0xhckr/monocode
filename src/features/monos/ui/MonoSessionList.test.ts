@@ -58,7 +58,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function render(sessions: Session[] = [], launches = [launch]) {
+async function render(
+  sessions: Session[] = [],
+  launches = [launch],
+  props: Record<string, unknown> = {},
+) {
   await act(async () =>
     root.render(
       createElement(MonoSessionList, {
@@ -66,6 +70,7 @@ async function render(sessions: Session[] = [], launches = [launch]) {
         launches,
         sessions,
         onOpenSession,
+        ...props,
       }),
     ),
   );
@@ -137,15 +142,24 @@ it("keeps the link usable after a session moves to another project", async () =>
   expect(onOpenSession).toHaveBeenCalledWith(launch.sessionId);
 });
 
-it("keeps deleted launches visible as unavailable and does not offer to open them", async () => {
+it("hides deleted launches until filtered to, then shows them as cards that do not open", async () => {
   await render();
-  expect(container.textContent).toContain(launch.title);
-  expect(container.textContent).toContain("No longer available");
-  const button = container.querySelector<HTMLButtonElement>(
-    "[data-mono-session]",
-  )!;
-  expect(button.disabled).toBe(true);
-  act(() => button.click());
+  expect(container.querySelector("[data-session-card]")).toBeNull();
+  expect(container.textContent).toContain("have since been deleted");
+  await render([], [launch], {
+    filters: {
+      showArchived: false,
+      showUnavailable: true,
+      hiddenHarnesses: [],
+      time: "all",
+      status: { working: false, needsApproval: false, done: false },
+    },
+  });
+  const card = container.querySelector<HTMLElement>("[data-session-card]")!;
+  expect(card.textContent).toContain(launch.title);
+  expect(card.textContent).toContain("Unavailable");
+  expect(card.closest("[inert]")).not.toBeNull();
+  act(() => card.click());
   expect(onOpenSession).not.toHaveBeenCalled();
 });
 
@@ -155,7 +169,7 @@ it("allows opening when status lookup fails and reports navigation errors", asyn
   await render();
   expect(container.textContent).toContain("Status unavailable");
   await act(async () =>
-    container.querySelector<HTMLButtonElement>("[data-mono-session]")!.click(),
+    container.querySelector<HTMLElement>("[data-session-card]")!.click(),
   );
   expect(container.querySelector('[role="alert"]')?.textContent).toBe(
     "Could not restore session",

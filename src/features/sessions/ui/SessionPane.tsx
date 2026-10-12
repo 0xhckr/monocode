@@ -19,7 +19,7 @@ import {
 } from "../../orchestration/model/orchestration";
 import { DiscussionEmpty } from "./DiscussionEmpty";
 import { LinkedWorkItemUpdateNotice } from "../../inbox/ui/LinkedWorkItemUpdateNotice";
-import { SessionChangesButton, SessionReview } from "./SessionReview";
+import { SessionReview } from "./SessionReview";
 import { sessionEditPaths } from "../model/checkpointEdits";
 import { PromptOutline } from "./PromptOutline";
 import {
@@ -1062,18 +1062,6 @@ const LocalSessionPane = memo(function LocalSessionPane({
                             recallLastTurnRef.current?.();
                           }
                         : undefined
-                    }
-                    editTurnAction={
-                      reviewHidden || !agent ? undefined : (
-                        <SessionChangesButton
-                          sessionId={session.id}
-                          editedPaths={editedPaths}
-                          cwd={workCwd}
-                          enabled={visible}
-                          busy={!!session.busy}
-                          onOpenDiff={onOpenDiff}
-                        />
-                      )
                     }
                     latestTurnAccessory={
                       reviewHidden || agent ? undefined : (

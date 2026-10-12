@@ -3,6 +3,7 @@ import { IconButton } from "../../../app/shell/TitleBar";
 import {
   Clock,
   File,
+  FileDiff,
   ListFilter,
   MessageMultiple,
   Plus,
@@ -33,14 +34,29 @@ import {
 } from "../../sessions/model/sessionFilters";
 import { HARNESSES, type HarnessId } from "../../sessions/model/session";
 import { MonoSidebar, MonoSidebarHeader } from "./MonoSidebar";
+import type { SessionChangeTotals } from "../../sessions/ui/SessionReview";
+import { MonoChangesView, type MonoChangesRequest } from "./MonoChangesView";
 
-export type MonoOverviewTab = "sessions" | "habits" | "documents";
+export type MonoOverviewTab = "sessions" | "habits" | "documents" | "changes";
 
 const TABS: { id: MonoOverviewTab; label: string; icon: typeof Clock }[] = [
   { id: "sessions", label: "Sessions", icon: MessageMultiple },
   { id: "documents", label: "Documents", icon: File },
   { id: "habits", label: "Habits", icon: Clock },
+  { id: "changes", label: "Changes", icon: FileDiff },
 ];
+
+/** The conversation's recorded changes, reviewed and committed on their tab. */
+export type MonoOverviewChanges = {
+  sessionId: string;
+  cwd: string;
+  /** Null while the conversation has no changes. */
+  totals: SessionChangeTotals | null;
+  request: MonoChangesRequest;
+  textHarness?: HarnessId;
+  /** The projects the Mono works on. */
+  projects: readonly string[];
+};
 
 type Route = { kind: "new-habit" } | { kind: "habit"; id: string };
 
@@ -57,6 +73,7 @@ type Props = {
   history?: readonly SessionSummary[];
   /** Documents it has written, oldest first. */
   documents: readonly ArtifactCard[];
+  changes?: MonoOverviewChanges;
   tab: MonoOverviewTab;
   onTabChange: (tab: MonoOverviewTab) => void;
   onOpenSession: (sessionId: string) => void | Promise<void>;
@@ -87,6 +104,7 @@ export function MonoOverview({
   sessions,
   history,
   documents,
+  changes,
   tab,
   onTabChange,
   onOpenSession,
@@ -108,6 +126,10 @@ export function MonoOverview({
   const [filters, setFilters] = useState<SessionSidebarFilters>(
     DEFAULT_SESSION_SIDEBAR_FILTERS,
   );
+  // Once opened, the changes stay mounted so a commit draft survives a look
+  // at another tab.
+  const [changesVisited, setChangesVisited] = useState(tab === "changes");
+  if (tab === "changes" && !changesVisited) setChangesVisited(true);
   // Another Mono starts at its own front page, with all its sessions.
   useEffect(() => {
     setRoutes([]);
@@ -188,6 +210,7 @@ export function MonoOverview({
     sessions: launches.length,
     habits: habits?.length,
     documents: documents.length,
+    changes: changes?.totals?.files,
   };
 
   return (
@@ -203,7 +226,11 @@ export function MonoOverview({
         <MonoSidebarHeader
           title="Overview"
           heading={
-            <OverviewTabs tab={tab} counts={counts} onChange={onTabChange} />
+            <OverviewTabs
+              tab={tab}
+              counts={counts}
+              onChange={onTabChange}
+            />
           }
           onClose={onClose}
           actions={
@@ -233,12 +260,31 @@ export function MonoOverview({
             )}
           />
         ) : null}
+        {changes && changesVisited ? (
+          <div
+            role="tabpanel"
+            aria-label="Changes"
+            hidden={tab !== "changes"}
+            className="flex min-h-0 flex-1 flex-col"
+            data-mono-overview={tab === "changes" ? "changes" : undefined}
+          >
+            <MonoChangesView
+              sessionId={changes.sessionId}
+              cwd={changes.cwd}
+              request={changes.request}
+              textHarness={changes.textHarness}
+              agentName={agent.name}
+              attachedProjects={changes.projects}
+            />
+          </div>
+        ) : null}
         <div
           ref={lock}
           role="tabpanel"
           aria-label={TABS.find((entry) => entry.id === tab)?.label}
+          hidden={tab === "changes"}
           className="min-h-0 flex-1 overflow-y-auto overscroll-none px-2 py-2"
-          data-mono-overview={tab}
+          data-mono-overview={tab === "changes" ? undefined : tab}
         >
           {tab === "sessions" ? (
             launches.length ? (
@@ -356,6 +402,7 @@ function SessionSearchBar({
           x={menu.x}
           y={menu.y}
           harnesses={harnesses}
+          unavailableOption
           filters={filters}
           onChange={onFiltersChange}
           onClose={() => setMenu(null)}

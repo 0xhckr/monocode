@@ -9,9 +9,24 @@ vi.mock("../model/monoHabits", async (original) => ({
   loadHabits: async () => [],
 }));
 
+vi.mock("./MonoChangesView", () => ({
+  MonoChangesView: () => createElement("p", { "data-changes-view": "" }),
+}));
+
 vi.mock("../../sessions/data/sessionStore", async (original) => ({
   ...(await original<object>()),
-  listSessionsByProject: async () => [],
+  // Both launches are still saved; deleted ones are hidden by default.
+  listSessionsByProject: async (cwd: string) =>
+    ["a", "b"].map((id) => ({
+      id,
+      cwd,
+      harness: "codex",
+      model: "codex:gpt-5.4",
+      runtimeMode: "auto",
+      title: id,
+      createdAt: 1,
+      updatedAt: 1,
+    })),
   getSession: async () => null,
 }));
 
@@ -90,16 +105,47 @@ it("names only the open tab, with its count, and switches tabs", async () => {
   const labels = tabs().map((tab) =>
     tab.querySelector("[data-tab-label]")!.getAttribute("data-tab-label"),
   );
-  expect(labels).toEqual(["open", "closed", "closed"]);
+  expect(labels).toEqual(["open", "closed", "closed", "closed"]);
   expect(tabs().map((tab) => tab.getAttribute("aria-label"))).toEqual([
     "Sessions",
     "Documents",
     "Habits",
+    "Changes",
   ]);
   expect(tabs()[0].textContent).toBe("Sessions2");
   expect(tabs()[0].getAttribute("aria-selected")).toBe("true");
   act(() => tabs()[1].click());
   expect(onTabChange).toHaveBeenCalledWith("documents");
+});
+
+const changes = (totals: unknown) => ({
+  changes: {
+    sessionId: "mono",
+    cwd: "/home",
+    totals,
+    request: {},
+    projects: [],
+  },
+});
+
+it("always offers a Changes tab and keeps its view mounted once opened", async () => {
+  await render("sessions", vi.fn(), changes(null));
+  expect(tabs()[3].getAttribute("aria-label")).toBe("Changes");
+  expect(container.querySelector("[data-changes-view]")).toBeNull();
+  const onTabChange = vi.fn();
+  await render(
+    "changes",
+    onTabChange,
+    changes({ files: 3, additions: 12, deletions: 4 }),
+  );
+  expect(tabs()[3].textContent).toBe("Changes3");
+  expect(container.querySelector("[data-changes-view]")).not.toBeNull();
+  // Another tab keeps the view mounted, hidden, so a commit draft survives.
+  await render("sessions", onTabChange, changes(null));
+  expect(tabs()[3].getAttribute("aria-label")).toBe("Changes");
+  expect(
+    container.querySelector("[data-changes-view]")!.closest("[hidden]"),
+  ).not.toBeNull();
 });
 
 it("lists every session it started, newest first", async () => {

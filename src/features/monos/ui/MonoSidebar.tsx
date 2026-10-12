@@ -18,14 +18,14 @@ export function MonoSidebar({
   children,
 }: {
   open: boolean;
-  kind: "details" | "activity" | "sessions" | "artifact" | "changes";
+  kind: "details" | "activity" | "sessions" | "artifact";
   label: string;
   color: string;
   windowControls?: ReactNode;
   children: ReactNode;
 }) {
-  // Readers (documents, diffs) open wide; the others start narrow.
-  const reader = kind === "artifact" || kind === "changes";
+  // Readers (documents) open wide; the others start narrow.
+  const reader = kind === "artifact";
   const resize = useDragResize({
     min: reader ? 360 : MIN_WIDTH,
     // The overview hosts whole sessions and documents now, so it may grow
@@ -49,7 +49,6 @@ export function MonoSidebar({
       data-mono-activity={kind === "activity" ? "" : undefined}
       data-mono-sessions={kind === "sessions" ? "" : undefined}
       data-mono-artifact={kind === "artifact" ? "" : undefined}
-      data-mono-changes={kind === "changes" ? "" : undefined}
       data-open={open}
       style={
         {

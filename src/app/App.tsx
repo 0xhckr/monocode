@@ -340,6 +340,7 @@ import {
 
 import { isEditTool } from "../integrations/harness/core/preview";
 import { sessionEditPaths } from "../features/sessions/model/checkpointEdits";
+import { useSessionChangeTotals } from "../features/sessions/ui/SessionReview";
 import {
   createEditedResendAttempt,
   createEditedResendCoordinator,
@@ -631,10 +632,7 @@ import {
   removeArtifactCard,
   ARTIFACT_DELETED_EVENT,
 } from "../features/artifacts/artifacts";
-import {
-  MonoChangesPanel,
-  type MonoChangesRequest,
-} from "../features/monos/ui/MonoChangesPanel";
+import type { MonoChangesRequest } from "../features/monos/ui/MonoChangesView";
 import { ArtifactPanel } from "../features/artifacts/ui/ArtifactPanel";
 import {
   claimDueAutomations,
@@ -1119,23 +1117,15 @@ function Workspace({
         : null;
     setMonoOverviewOpen(false);
     setMonoActivity(null);
-    setMonoChanges(null);
     setMonoArtifact({ sessionId, id });
   }, []);
   const onCloseMonoArtifact = useCallback(() => {
     setMonoArtifact(null);
     monoArtifactOpener.current?.focus();
   }, []);
-  const [monoChanges, setMonoChanges] = useState<{
-    sessionId: string;
-    cwd: string;
-    request: MonoChangesRequest;
-  } | null>(null);
-  const monoChangesOpener = useRef<HTMLElement | null>(null);
-  const onCloseMonoChanges = useCallback(() => {
-    setMonoChanges(null);
-    monoChangesOpener.current?.focus();
-  }, []);
+  // What the overview's Changes tab was last asked to show.
+  const [monoChangesRequest, setMonoChangesRequest] =
+    useState<MonoChangesRequest>({});
   useEffect(() => {
     const listening = listen<string>(
       ARTIFACT_DELETED_EVENT,
@@ -1181,7 +1171,6 @@ function Workspace({
     (sessionId: string, turnId: string, blocks: Block[]) => {
       setMonoOverviewOpen(false);
       setMonoArtifact(null);
-      setMonoChanges(null);
       setMonoActivity((previous) =>
         previous?.sessionId === sessionId && previous.turnId === turnId
           ? null
@@ -1200,7 +1189,6 @@ function Workspace({
     setMonoViewId(null);
     setMonoActivity(null);
     setMonoArtifact(null);
-    setMonoChanges(null);
   }, []);
   const [composerFocused, setComposerFocused] = useState(() => {
     if (windowTransfer) return true;
@@ -4149,37 +4137,29 @@ function Workspace({
     [activeTabId],
   );
 
-  // A Mono view covers the workspace, so its session changes open beside the
-  // chat instead of in a project tab hidden behind it.
-  const openMonoChanges = useCallback(
-    (
-      session: { sessionId: string; cwd: string },
-      request: MonoChangesRequest,
-    ) => {
-      monoChangesOpener.current =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      setMonoOverviewOpen(false);
-      setMonoActivity(null);
-      setMonoArtifact(null);
-      setMonoChanges({ ...session, request });
-    },
-    [],
-  );
+  // A Mono view covers the workspace, so its session changes open on the
+  // overview's Changes tab instead of in a project tab hidden behind it.
+  const openMonoChanges = useCallback((request: MonoChangesRequest) => {
+    setMonoActivity(null);
+    setMonoArtifact(null);
+    setMonoShownSession(null);
+    setMonoOverviewDocument(null);
+    setMonoChangesRequest(request);
+    setMonoOverviewTab("changes");
+    setMonoOverviewOpen(true);
+  }, []);
   const onOpenMonoDiff = useCallback(
     (path?: string, session?: { sessionId: string; cwd: string }) => {
       if (!session) {
         onOpenDiff(path);
         return;
       }
-      openMonoChanges(session, { path, tab: "changes" });
+      openMonoChanges({ path });
     },
     [onOpenDiff, openMonoChanges],
   );
   const onCommitMonoChanges = useCallback(
-    (session: { sessionId: string; cwd: string }) =>
-      openMonoChanges(session, { tab: "commit" }),
+    () => openMonoChanges({}),
     [openMonoChanges],
   );
 
@@ -4907,7 +4887,6 @@ function Workspace({
       const session = await ensureOpenSession(launchedId).catch(() => null);
       if (monoViewIdRef.current !== monoSessionId) return;
       setMonoArtifact(null);
-      setMonoChanges(null);
       setMonoActivity(null);
       setMonoOverviewTab("sessions");
       setMonoOverviewDocument(null);
@@ -12482,9 +12461,27 @@ function Workspace({
   const monoSidebarOpen =
     monoOverviewOpen ||
     !!selectedMonoActivity ||
-    (monoArtifact?.sessionId === monoViewSession?.id && !!monoArtifact) ||
-    (monoChanges?.sessionId === monoViewSession?.id && !!monoChanges);
+    (monoArtifact?.sessionId === monoViewSession?.id && !!monoArtifact);
   const monoViewBlocks = monoViewSession?.blocks;
+  const monoViewBusy = !!monoViewSession?.busy;
+  const monoViewCwd = monoViewSession ? sessionWorkCwd(monoViewSession) : "";
+  const monoEditedPaths = useMemo(
+    () =>
+      monoViewBlocks && !monoViewBusy
+        ? sessionEditPaths(monoViewBlocks)
+        : undefined,
+    [monoViewBlocks, monoViewBusy],
+  );
+  // The session's changes, on the overview's tab instead of under a message.
+  const monoChangeTotals = useSessionChangeTotals(
+    monoViewSession?.id ?? "",
+    monoViewCwd,
+    {
+      enabled: !monoViewSession?.worktreeRemoved,
+      busy: monoViewBusy,
+      editedPaths: monoEditedPaths,
+    },
+  );
   const monoLaunches = useMemo(
     () => (monoViewBlocks ? monoSpawnedSessions(monoViewBlocks) : []),
     [monoViewBlocks],
@@ -12497,8 +12494,7 @@ function Workspace({
   const monoOverviewShown =
     monoOverviewOpen &&
     !selectedMonoActivity &&
-    monoArtifact?.sessionId !== monoViewSession?.id &&
-    monoChanges?.sessionId !== monoViewSession?.id;
+    monoArtifact?.sessionId !== monoViewSession?.id;
   const monoActivityPanel =
     monoViewMono && monoViewSession && selectedMonoActivity ? (
       <MonoActivityPanel
@@ -12627,6 +12623,14 @@ function Workspace({
         sessions={sessions}
         history={history}
         documents={monoDocuments}
+        changes={{
+          sessionId: monoViewSession.id,
+          cwd: monoViewCwd,
+          totals: monoChangeTotals,
+          request: monoChangesRequest,
+          textHarness: monoViewSession.harness,
+          projects: monoViewMono.projects,
+        }}
         tab={monoOverviewTab}
         onTabChange={setMonoOverviewTab}
         onOpenSession={(sessionId) =>
@@ -12761,7 +12765,6 @@ function Workspace({
           ? () => {
               setMonoActivity(null);
               setMonoArtifact(null);
-              setMonoChanges(null);
               setMonoOverviewOpen(!monoOverviewShown);
             }
           : undefined
@@ -13203,21 +13206,6 @@ function Workspace({
                       color={monoViewMono.color}
                       onClose={onCloseMonoArtifact}
                       onOpenFile={onOpenFile}
-                      windowControls={
-                        monoCovers && !IS_MAC ? <WindowControls /> : undefined
-                      }
-                    />
-                  ) : null}
-                  {monoViewMono &&
-                  monoChanges &&
-                  monoChanges.sessionId === monoViewSession?.id ? (
-                    <MonoChangesPanel
-                      sessionId={monoChanges.sessionId}
-                      cwd={monoChanges.cwd}
-                      request={monoChanges.request}
-                      color={monoViewMono.color}
-                      textHarness={monoViewSession?.harness}
-                      onClose={onCloseMonoChanges}
                       windowControls={
                         monoCovers && !IS_MAC ? <WindowControls /> : undefined
                       }

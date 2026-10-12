@@ -3,7 +3,6 @@ import { LIST_PAGE_SIZE, listWindowSize } from "../../../shared/lib/listWindow";
 import { projectName } from "../../../shared/lib/paths";
 import { IconButton } from "../../../app/shell/TitleBar";
 import {
-  ChevronRight,
   ExternalLink,
   PanelRightToggle,
   Search,
@@ -21,20 +20,17 @@ import {
 import {
   DEFAULT_SESSION_SIDEBAR_FILTERS,
   filterSessionsByHarness,
+  hasActiveSessionFilters,
   filterSessionsByStatus,
   filterSessionsByTime,
   type SessionSidebarFilters,
 } from "../../sessions/model/sessionFilters";
 import { fuzzyMatch } from "../../../shared/lib/fuzzy";
-import { resolveModel } from "../../sessions/model/models";
 import {
   hasPendingApproval,
-  sessionDisplayTitle,
-  sessionDraftBlock,
   type MonoSpawnedSession,
   type Session,
 } from "../../sessions/model/session";
-import { HarnessIcon } from "../../sessions/ui/HarnessIcon";
 import { SessionCard } from "../../../app/shell/Sidebar";
 import type { MonoLook } from "../model/mono";
 import { EmptyState, PageHeader } from "./monoPanelParts";
@@ -185,6 +181,19 @@ export function MonoSessionList({
       }
     );
   });
+  // Launched, then deleted: its project's sessions are known, and it is not
+  // among them.
+  const unavailableIds = new Set(
+    launches
+      .filter(
+        (launch) =>
+          stored.loaded.has(launch.cwd) &&
+          !sessions.some((entry) => entry.id === launch.sessionId) &&
+          !history.some((entry) => entry.id === launch.sessionId) &&
+          !stored.byId.has(launch.sessionId),
+      )
+      .map((launch) => launch.sessionId),
+  );
   const busyIds = new Set<string>();
   const approvalIds = new Set<string>();
   const doneIds = new Set<string>();
@@ -199,7 +208,13 @@ export function MonoSessionList({
     filterSessionsByTime(
       filterSessionsByHarness(
         // Archived launches stay with the rest; the filter narrows to them.
-        filters.showArchived ? filterSessionsByArchive(rows, true) : rows,
+        // Deleted ones are hidden unless the filter asks for just them.
+        (filters.showArchived
+          ? filterSessionsByArchive(rows, true)
+          : rows
+        ).filter(
+          (row) => unavailableIds.has(row.id) === !!filters.showUnavailable,
+        ),
         filters.hiddenHarnesses,
       ),
       filters.time,
@@ -254,7 +269,12 @@ export function MonoSessionList({
   if (launches.length > 0 && matching.length === 0)
     return (
       <EmptyState icon={Search}>
-        No sessions match {needle ? "this search" : "these filters"}.
+        {needle
+          ? "No sessions match this search."
+          : hasActiveSessionFilters(filters)
+            ? "No sessions match these filters."
+            : // Every one it started is gone; the filter still lists them.
+              `The sessions ${agent.name} started have since been deleted.`}
       </EmptyState>
     );
 
@@ -266,7 +286,6 @@ export function MonoSessionList({
           const saved =
             history.find((entry) => entry.id === launch.sessionId) ??
             stored.byId.get(launch.sessionId);
-          const unavailable = !live && !saved && stored.loaded.has(launch.cwd);
           // Once it is known, it gets the sidebar's own card: model, status,
           // title, branch or worktree, and any linked PR or issue.
           const summary: SessionSummary | undefined = live
@@ -303,106 +322,60 @@ export function MonoSessionList({
                 />
               </div>
             );
-          const session = live ?? saved;
-          const harness = session?.harness ?? launch.harness;
-          const model = resolveModel(
-            harness,
-            session?.model ?? launch.model,
-          ).name;
-          const title = sessionDisplayTitle(
-            session?.title ?? launch.title,
-            harness,
-          );
-          const status = unavailable
-            ? "No longer available"
-            : live && (hasPendingApproval(live.blocks) || live.pendingQuestion)
-              ? "Needs input"
-              : live?.busy
-                ? "Working"
-                : saved?.archived
-                  ? "Archived"
-                  : (live ? !!sessionDraftBlock(live) : saved?.draft)
-                    ? "Draft"
-                    : session
-                      ? "Ready"
-                      : stored.failed.has(launch.cwd)
-                        ? "Status unavailable"
-                        : "Loading…";
-          // Until it is known, hold its place without a card of another look
-          // that the real one would replace a moment later.
-          if (status === "Loading…")
-            return (
-              <div
-                key={launch.sessionId}
-                aria-hidden
-                inert
-                data-mono-session-loading={launch.sessionId}
-                className="invisible"
-              >
-                <SessionCard
-                  session={{
-                    id: launch.sessionId,
-                    cwd: launch.cwd,
-                    harness: launch.harness,
-                    model: launch.model,
-                    runtimeMode: "auto",
-                    title: launch.title,
-                    createdAt: 0,
-                    updatedAt: 0,
-                  }}
-                  modelInFooter
-                  isActive={false}
-                  isSelected={false}
-                  busy={false}
-                  done={false}
-                  linkedUpdate={false}
-                  needsApproval={false}
-                  project={projectName(launch.cwd)}
-                  now={0}
-                  onSelect={() => {}}
-                />
-              </div>
-            );
+          // Not known, either deleted or not looked up: the sidebar's card
+          // still, from what the launch recorded.
+          const unavailable = unavailableIds.has(launch.sessionId);
+          const failed = !unavailable && stored.failed.has(launch.cwd);
+          const loading = !unavailable && !failed;
           return (
-            <button
+            <div
               key={launch.sessionId}
-              type="button"
-              data-mono-session={launch.sessionId}
-              disabled={unavailable || !!opening}
-              onClick={() => void open(launch.sessionId)}
-              className="group flex w-full items-center gap-2 rounded-lg border border-stroke bg-content/3 px-3 py-2.5 text-left outline-none hover:border-content/20 hover:bg-content/6 focus-visible:ring-1 focus-visible:ring-accent disabled:cursor-default disabled:opacity-50"
+              data-mono-session={loading ? undefined : launch.sessionId}
+              data-mono-session-loading={loading ? launch.sessionId : undefined}
+              data-mono-session-unavailable={unavailable ? "" : undefined}
+              // Until it is known, hold its place without a card of another
+              // look that the real one would replace a moment later.
+              aria-hidden={loading || undefined}
+              aria-disabled={unavailable || undefined}
+              inert={loading || unavailable}
+              className={
+                loading ? "invisible" : unavailable ? "opacity-50" : ""
+              }
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-content">
-                  {title}
-                </p>
-                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-content/45">
-                  <HarnessIcon harness={harness} className="size-3 shrink-0" />
-                  <span className="truncate">{model}</span>
-                  <span aria-hidden>·</span>
-                  <span className="truncate" title={session?.cwd ?? launch.cwd}>
-                    {agent.projects.find(
-                      (project) =>
-                        project.path === (session?.cwd ?? launch.cwd),
-                    )?.name ?? projectName(session?.cwd ?? launch.cwd)}
-                  </span>
-                </div>
-                <p
-                  className="mt-2 flex items-center gap-1.5 text-[11px] text-content/55"
-                  role="status"
-                >
-                  <span
-                    aria-hidden
-                    className={`size-1.5 rounded-full ${status === "Working" ? "animate-pulse bg-[var(--mono-color)]" : status === "Needs input" ? "bg-amber-500/70" : "bg-content/30"}`}
-                  />
-                  {opening === launch.sessionId ? "Opening…" : status}
-                </p>
-              </div>
-              <ChevronRight
-                aria-hidden
-                className="size-3.5 shrink-0 text-content/30 group-hover:text-content/60"
+              <SessionCard
+                session={{
+                  id: launch.sessionId,
+                  cwd: launch.cwd,
+                  harness: launch.harness,
+                  model: launch.model,
+                  runtimeMode: "auto",
+                  title: launch.title,
+                  createdAt: 0,
+                  updatedAt: 0,
+                }}
+                modelInFooter
+                statusLabel={
+                  unavailable
+                    ? "Unavailable"
+                    : opening === launch.sessionId
+                      ? "Opening…"
+                      : failed
+                        ? "Status unavailable"
+                        : ""
+                }
+                isActive={false}
+                isSelected={false}
+                busy={false}
+                done={false}
+                linkedUpdate={false}
+                needsApproval={false}
+                project={projectLabel(launch.cwd)}
+                now={0}
+                onSelect={(id) => {
+                  if (failed && !opening) void open(id);
+                }}
               />
-            </button>
+            </div>
           );
         })}
       </div>

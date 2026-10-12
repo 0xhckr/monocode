@@ -3228,6 +3228,7 @@ export const SessionCard = memo(function SessionCard({
   dropTarget,
   compact = false,
   modelInFooter = false,
+  statusLabel,
   project,
   now,
   onSelect,
@@ -3253,6 +3254,8 @@ export const SessionCard = memo(function SessionCard({
   /** Shows the model as its provider's mark beside the branch, so the title
    * shares its row with the time and the card is a line shorter. */
   modelInFooter?: boolean;
+  /** Stands in for the time, for a session with no state of its own to show. */
+  statusLabel?: string;
   /** Names its project before the branch, where sessions span several. */
   project?: string;
   now: number;
@@ -3331,7 +3334,7 @@ export const SessionCard = memo(function SessionCard({
           <span>Draft</span>
         </>
       ) : (
-        <span>{time}</span>
+        <span>{statusLabel ?? time}</span>
       )}
     </span>
   );
