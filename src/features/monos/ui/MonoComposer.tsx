@@ -445,7 +445,9 @@ export function MonoComposer({
         )}
       </div>
       {inline ? null : (
-        <div className="flex min-w-0 items-center gap-0.5 px-1 pt-1">
+        // The right inset matches the box's border and padding, so the last
+        // control lines up under send.
+        <div className="flex min-w-0 items-center gap-0.5 pt-1 pl-1 pr-1.5">
           {attachButton(TOOL_BUTTON, true)}
           <button
             ref={emojiButton}

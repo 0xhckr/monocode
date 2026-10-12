@@ -281,6 +281,7 @@ export function MonoSessionList({
               <div key={launch.sessionId} data-mono-session={launch.sessionId}>
                 <SessionCard
                   session={summary}
+                  modelInFooter
                   isActive={false}
                   isSelected={false}
                   busy={!!live?.busy}
@@ -349,6 +350,7 @@ export function MonoSessionList({
                     createdAt: 0,
                     updatedAt: 0,
                   }}
+                  modelInFooter
                   isActive={false}
                   isSelected={false}
                   busy={false}
