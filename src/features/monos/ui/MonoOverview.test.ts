@@ -148,6 +148,24 @@ it("always offers a Changes tab and keeps its view mounted once opened", async (
   ).not.toBeNull();
 });
 
+it("dots the folded Changes icon while there are changes", async () => {
+  await render("sessions", vi.fn(), changes(null));
+  expect(tabs()[3].querySelector("[data-changes-dot]")).toBeNull();
+  await render(
+    "sessions",
+    vi.fn(),
+    changes({ files: 2, additions: 3, deletions: 1 }),
+  );
+  expect(tabs()[3].querySelector("[data-changes-dot]")).not.toBeNull();
+  // Open, the tab names its count instead.
+  await render(
+    "changes",
+    vi.fn(),
+    changes({ files: 2, additions: 3, deletions: 1 }),
+  );
+  expect(tabs()[3].querySelector("[data-changes-dot]")).toBeNull();
+});
+
 it("lists every session it started, newest first", async () => {
   await render("sessions");
   const rows = [...container.querySelectorAll("[data-mono-session]")];

@@ -450,7 +450,21 @@ function OverviewTabs({
                 : "text-content/45 hover:bg-content/5 hover:text-content/80"
             }`}
           >
-            <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+            {/* Folded tabs dot their icon, as the rail does, when they hold something new. */}
+            {id === "changes" && !selected && count ? (
+              <span className="relative grid shrink-0" data-changes-dot>
+                <Icon
+                  className="overview-tab-icon-with-dot size-3.5"
+                  strokeWidth={1.75}
+                />
+                <span
+                  aria-hidden
+                  className="absolute -top-0.5 left-2.5 size-1.5 rounded-full bg-accent"
+                />
+              </span>
+            ) : (
+              <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+            )}
             {/* The name and count open out of the icon, and fold back into it. */}
             <span
               aria-hidden={!selected}
