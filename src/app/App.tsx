@@ -559,11 +559,13 @@ import {
   findMono,
   isMonoSession,
   listMonos,
+  loadOpenMono,
   monoForSession,
   monoLook,
   monosSnapshot,
   monoState,
   removeMono,
+  saveOpenMono,
   subscribeMonos,
   type MonoState,
 } from "../features/monos/model/mono";
@@ -1194,6 +1196,7 @@ function Workspace({
   const closeMonoView = useCallback(() => {
     monoViewRequest.current += 1;
     monoViewIdRef.current = null;
+    saveOpenMono(undefined);
     setMonoViewId(null);
     setMonoActivity(null);
     setMonoArtifact(null);
@@ -4719,6 +4722,7 @@ function Workspace({
       });
       if (!session || request !== monoViewRequest.current) return;
       monoViewIdRef.current = session.id;
+      saveOpenMono(monoId);
       setMonoViewId(session.id);
       setProjectTerminalFocused(false);
       setComposerFocused(true);
@@ -4726,6 +4730,18 @@ function Workspace({
     },
     [ensureOpenSession, workspaceNavigation.cancel],
   );
+
+  // A Mono open when the app last closed opens again; a moved window keeps
+  // what it carried.
+  const reopenedMono = useRef(false);
+  useEffect(() => {
+    if (reopenedMono.current) return;
+    reopenedMono.current = true;
+    if (windowTransfer || !monosEnabled) return;
+    const monoId = loadOpenMono();
+    if (monoId && findMono(monoId)) void onOpenMono(monoId);
+    else if (monoId) saveOpenMono(undefined);
+  }, [monosEnabled, onOpenMono, windowTransfer]);
 
   /** The shortcut opens the last Mono, or the first on the rail. */
   const onToggleMono = useCallback(() => {

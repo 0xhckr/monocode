@@ -259,6 +259,26 @@ export function dismissMonoIntro(): void {
   window.dispatchEvent(new CustomEvent(MONOS_CHANGED));
 }
 
+const OPEN_MONO_KEY = "monocode:open-mono";
+
+/** The Mono whose conversation was open, so the next launch reopens it. */
+export function loadOpenMono(): string | undefined {
+  try {
+    return localStorage.getItem(OPEN_MONO_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveOpenMono(monoId: string | undefined): void {
+  try {
+    if (monoId) localStorage.setItem(OPEN_MONO_KEY, monoId);
+    else localStorage.removeItem(OPEN_MONO_KEY);
+  } catch {
+    // The next launch opens the workspace instead; harmless.
+  }
+}
+
 function uniqueProjects(paths: readonly string[]): string[] {
   const seen = new Set<string>();
   return paths.filter((path) => {
