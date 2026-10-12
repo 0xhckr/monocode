@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LIST_PAGE_SIZE, listWindowSize } from "../../../shared/lib/listWindow";
 import { projectName } from "../../../shared/lib/paths";
 import { IconButton } from "../../../app/shell/TitleBar";
 import {
@@ -221,9 +222,36 @@ export function MonoSessionList({
         ].map((row) => row.id)
       : filtered.map((row) => row.id),
   );
-  const shown = launches.filter((launch) => matched.has(launch.sessionId));
+  const matching = launches.filter((launch) => matched.has(launch.sessionId));
+  // A page of cards mounts at a time, as in the sidebar; the sentinel below
+  // asks for the next one as it nears the panel's bottom. Searching or
+  // filtering starts over from the first page.
+  const [limit, setLimit] = useState(LIST_PAGE_SIZE);
+  const list = useRef<HTMLDivElement>(null);
+  const loadMore = useRef<HTMLDivElement>(null);
+  const listKey = `${needle}\0${JSON.stringify(filters)}`;
+  useEffect(() => {
+    setLimit(LIST_PAGE_SIZE);
+    const scroller = scrollParent(list.current);
+    if (scroller) scroller.scrollTop = 0;
+  }, [listKey]);
+  const shown = matching.slice(0, listWindowSize(matching.length, limit));
+  const hasMore = shown.length < matching.length;
+  useEffect(() => {
+    const sentinel = loadMore.current;
+    if (!hasMore || !sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting)
+          setLimit((current) => current + LIST_PAGE_SIZE);
+      },
+      { root: scrollParent(sentinel), rootMargin: "240px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, shown.length]);
 
-  if (launches.length > 0 && shown.length === 0)
+  if (launches.length > 0 && matching.length === 0)
     return (
       <EmptyState icon={Search}>
         No sessions match {needle ? "this search" : "these filters"}.
@@ -231,7 +259,7 @@ export function MonoSessionList({
     );
 
   return (
-    <div>
+    <div ref={list}>
       <div className="flex flex-col gap-1">
         {shown.map((launch) => {
           const live = sessions.find((entry) => entry.id === launch.sessionId);
@@ -376,6 +404,7 @@ export function MonoSessionList({
           );
         })}
       </div>
+      {hasMore ? <div ref={loadMore} aria-hidden className="h-px" /> : null}
       {error ? (
         <p role="alert" className="px-1 pt-3 text-xs text-red-400">
           {error}
@@ -383,6 +412,15 @@ export function MonoSessionList({
       ) : null}
     </div>
   );
+}
+
+/** The nearest ancestor that scrolls, which the list pages against. */
+function scrollParent(node: HTMLElement | null): HTMLElement | null {
+  for (let el = node?.parentElement; el; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if (overflowY === "auto" || overflowY === "scroll") return el;
+  }
+  return null;
 }
 
 /** A launched session open over the overview, live and fully usable. */

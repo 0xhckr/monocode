@@ -280,3 +280,41 @@ it("narrows its cards by search, project and the sidebar's filters", async () =>
   expect(cards()).toHaveLength(0);
   expect(container.textContent).toContain("No sessions match this search.");
 });
+
+it("mounts a page of cards at a time and the next as the list nears its end", async () => {
+  let intersect: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(callback: typeof intersect) {
+        intersect = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const launches = Array.from({ length: 40 }, (_, index) => ({
+    ...launch,
+    sessionId: `app-${index}`,
+    title: `Session ${index}`,
+  }));
+  vi.mocked(listSessionsByProject).mockResolvedValue(
+    launches.map(
+      (entry) =>
+        ({
+          id: entry.sessionId,
+          cwd: entry.cwd,
+          harness: entry.harness,
+          model: entry.model,
+          runtimeMode: "default",
+          title: entry.title,
+          createdAt: 1,
+          updatedAt: 2,
+        }) as SessionSummary,
+    ),
+  );
+  await render([], launches);
+  expect(container.querySelectorAll("[data-mono-session]")).toHaveLength(32);
+  await act(async () => intersect?.([{ isIntersecting: true }]));
+  expect(container.querySelectorAll("[data-mono-session]")).toHaveLength(40);
+});
