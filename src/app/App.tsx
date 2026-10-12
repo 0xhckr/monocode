@@ -4702,6 +4702,13 @@ function Workspace({
         },
       });
       if (!session || request !== monoViewRequest.current) return;
+      // What the last Mono had open over its overview is its own; another
+      // Mono opens on its list.
+      if (monoViewIdRef.current !== session.id) {
+        setMonoShownSession(null);
+        setMonoShownSessionFocused(false);
+        setMonoOverviewDocument(null);
+      }
       monoViewIdRef.current = session.id;
       saveOpenMono(monoId);
       setMonoViewId(session.id);
