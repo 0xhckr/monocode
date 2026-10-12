@@ -1331,6 +1331,7 @@ function AgentTranscriptComponent({
                 }
                 layout={transcriptLayout}
                 bubbleTail={!!agentMascot}
+                localMedia={isMonoChat}
                 compactFollowUp={isCompactFollowUp(item, itemIndex)}
                 stackedOnPrevious={
                   itemIndex === 0
@@ -2182,6 +2183,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   underLine = false,
   embedded = false,
   cwd,
+  localMedia = false,
   onApproval,
   onSaveNote,
   onSendDraft,
@@ -2213,6 +2215,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
   /** True when the parent surface already provides the horizontal gutter. */
   embedded?: boolean;
   cwd?: string;
+  /** Show local images and videos a reply links to, as Mono chats do. */
+  localMedia?: boolean;
   onApproval?: (requestId: number, decision: ApprovalDecision) => void;
   onSaveNote?: (text: string) => void | Promise<void>;
   onSendDraft?: (block: Block) => boolean | void;
@@ -2357,6 +2361,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
         revealOnMount={revealOnMount}
         cwd={cwd}
         onOpenFile={onOpenFile}
+        localMedia={localMedia}
       />
     </div>
   );
