@@ -6,7 +6,6 @@ import { PanelRightToggle } from "../../../shared/ui/icons";
 const MIN_WIDTH = 340;
 const DEFAULT_WIDTH = 400;
 let rememberedWidth = DEFAULT_WIDTH;
-let rememberedArtifactWidth = 560;
 
 /** The shared frame for a Mono's details and turn sidebars. */
 export function MonoSidebar({
@@ -18,25 +17,22 @@ export function MonoSidebar({
   children,
 }: {
   open: boolean;
-  kind: "details" | "activity" | "sessions" | "artifact";
+  kind: "details" | "activity" | "sessions";
   label: string;
   color: string;
   windowControls?: ReactNode;
   children: ReactNode;
 }) {
-  // Readers (documents) open wide; the others start narrow.
-  const reader = kind === "artifact";
   const resize = useDragResize({
-    min: reader ? 360 : MIN_WIDTH,
-    // The overview hosts whole sessions and documents now, so it may grow
-    // as wide as a reader; either way the chat keeps a good share.
+    min: MIN_WIDTH,
+    // The overview hosts whole sessions and documents, so it may grow wide;
+    // either way the chat keeps a good share.
     max: () => Math.min(960, Math.round(window.innerWidth * 0.62)),
-    defaultWidth: reader ? 560 : DEFAULT_WIDTH,
-    initial: reader ? rememberedArtifactWidth : rememberedWidth,
+    defaultWidth: DEFAULT_WIDTH,
+    initial: rememberedWidth,
     direction: "left",
     onCommit: (width) => {
-      if (reader) rememberedArtifactWidth = width;
-      else rememberedWidth = width;
+      rememberedWidth = width;
     },
   });
   return (
@@ -48,7 +44,6 @@ export function MonoSidebar({
       data-mono-details={kind === "details" ? "" : undefined}
       data-mono-activity={kind === "activity" ? "" : undefined}
       data-mono-sessions={kind === "sessions" ? "" : undefined}
-      data-mono-artifact={kind === "artifact" ? "" : undefined}
       data-open={open}
       style={
         {

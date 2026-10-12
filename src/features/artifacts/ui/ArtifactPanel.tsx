@@ -1,38 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, PanelRightToggle, Trash2 } from "../../../shared/ui/icons";
 import { copyMessage } from "../../../platform/tauri/clipboard";
 import { IconButton } from "../../../app/shell/TitleBar";
-import { MonoSidebar, MonoSidebarHeader } from "../../monos/ui/MonoSidebar";
+import { MonoSidebarHeader } from "../../monos/ui/MonoSidebar";
 import { PageHeader } from "../../monos/ui/monoPanelParts";
 import { artifactLabel, deleteArtifact } from "../artifacts";
 import { ArtifactContent, useArtifact } from "./ArtifactContent";
-
-/** A document in a wide reader of its own, opened from the Mono's chat. */
-export function ArtifactPanel({
-  id,
-  color,
-  onClose,
-  onOpenFile,
-  windowControls,
-}: {
-  id: string;
-  color: string;
-  onClose: () => void;
-  onOpenFile?: (path: string) => void;
-  windowControls?: ReactNode;
-}) {
-  return (
-    <MonoSidebar
-      open
-      kind="artifact"
-      label="Document reader"
-      color={color}
-      windowControls={windowControls}
-    >
-      <ArtifactReader id={id} onClose={onClose} onOpenFile={onOpenFile} />
-    </MonoSidebar>
-  );
-}
 
 /**
  * A document's title, body and actions. With `onBack` it is a page over a
