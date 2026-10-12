@@ -445,7 +445,7 @@ function OverviewTabs({
             title={label}
             data-tauri-drag-region="false"
             onClick={() => onChange(id)}
-            className={`flex h-7 items-center rounded-lg px-2 text-[12px] transition-colors duration-200 ${
+            className={`flex h-6 items-center rounded-md px-2 text-[12px] transition-colors duration-200 ${
               selected
                 ? "bg-content/8 text-content"
                 : "text-content/45 hover:bg-content/5 hover:text-content/80"
