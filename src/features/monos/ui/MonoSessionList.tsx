@@ -33,6 +33,13 @@ export type ShownMonoSession = {
   pane: ReactNode;
 };
 
+/**
+ * Saved sessions already looked up, kept across lists. Switching Monos
+ * remounts the overview, and its cards should come back as they were rather
+ * than reload from blank.
+ */
+const storedSessions = new Map<string, SessionSummary>();
+
 /** Cards for launched sessions, with where each stands, open or saved. */
 export function MonoSessionList({
   agent,
@@ -61,7 +68,16 @@ export function MonoSessionList({
     byId: Map<string, SessionSummary>;
     loaded: Set<string>;
     failed: Set<string>;
-  }>({ byId: new Map(), loaded: new Set(), failed: new Set() });
+  }>(() => ({
+    byId: new Map(
+      launches.flatMap((launch) => {
+        const known = storedSessions.get(launch.sessionId);
+        return known ? [[launch.sessionId, known] as const] : [];
+      }),
+    ),
+    loaded: new Set(),
+    failed: new Set(),
+  }));
   const [opening, setOpening] = useState<string>();
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -99,6 +115,7 @@ export function MonoSessionList({
           failed.add(missing[index][1]);
         }
       });
+      for (const [id, summary] of byId) storedSessions.set(id, summary);
       setStored({ byId, loaded, failed });
     });
     return () => {
@@ -189,6 +206,40 @@ export function MonoSessionList({
                       : stored.failed.has(launch.cwd)
                         ? "Status unavailable"
                         : "Loading…";
+          // Until it is known, hold its place without a card of another look
+          // that the real one would replace a moment later.
+          if (status === "Loading…")
+            return (
+              <div
+                key={launch.sessionId}
+                aria-hidden
+                inert
+                data-mono-session-loading={launch.sessionId}
+                className="invisible"
+              >
+                <SessionCard
+                  session={{
+                    id: launch.sessionId,
+                    cwd: launch.cwd,
+                    harness: launch.harness,
+                    model: launch.model,
+                    runtimeMode: "auto",
+                    title: launch.title,
+                    createdAt: 0,
+                    updatedAt: 0,
+                  }}
+                  isActive={false}
+                  isSelected={false}
+                  busy={false}
+                  done={false}
+                  linkedUpdate={false}
+                  needsApproval={false}
+                  project={projectName(launch.cwd)}
+                  now={0}
+                  onSelect={() => {}}
+                />
+              </div>
+            );
           return (
             <button
               key={launch.sessionId}

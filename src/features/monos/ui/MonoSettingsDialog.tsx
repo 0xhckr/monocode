@@ -83,7 +83,8 @@ export function MonoSettingsDialog({
       minimalHeader
       fitViewport
       onClose={onClose}
-      className="h-[min(680px,calc(100dvh-32px))]"
+      // Centre the close button in the section header's 40px row.
+      className="h-[min(680px,calc(100dvh-32px))] [&>.modal-panel>header]:top-1.5"
     >
       <div
         className="flex h-full min-h-0 font-sans"

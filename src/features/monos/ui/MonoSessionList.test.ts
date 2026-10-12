@@ -187,3 +187,40 @@ it("shows a draft and then an approval without treating either as completed", as
   ]);
   expect(container.textContent).toContain("Need approval");
 });
+
+it("holds a loading card's place invisibly, and shows a known one at once when remounted", async () => {
+  let resolve!: (rows: SessionSummary[]) => void;
+  vi.mocked(listSessionsByProject).mockReturnValue(
+    new Promise((done) => (resolve = done)),
+  );
+  const cached = { ...launch, sessionId: "app-cached" };
+  await render([], [cached]);
+  // No stand-in card that the real one would swap in for.
+  expect(container.textContent).not.toContain("Loading");
+  expect(
+    container.querySelector('[data-mono-session-loading="app-cached"]'),
+  ).not.toBeNull();
+  await act(async () =>
+    resolve([
+      {
+        id: "app-cached",
+        cwd: "/repo",
+        harness: "codex",
+        model: "gpt-6",
+        runtimeMode: "auto",
+        title: "Cached review",
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ]),
+  );
+  expect(container.textContent).toContain("Cached review");
+  // Switching Monos remounts the list; the card comes straight back.
+  act(() => root.unmount());
+  root = createRoot(container);
+  vi.mocked(listSessionsByProject).mockReturnValue(new Promise(() => {}));
+  await render([], [cached]);
+  expect(container.querySelector("[data-session-card]")?.textContent).toContain(
+    "Cached review",
+  );
+});

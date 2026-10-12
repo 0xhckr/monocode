@@ -17,18 +17,24 @@ import {
 import { RunningFor, useHabitRunning } from "./HabitPage";
 import { Empty, Section } from "./monoPanelParts";
 
+/** Each Mono's habits as last loaded, so switching back shows them at once. */
+const loadedHabits = new Map<string, Habit[]>();
+
 /** The Mono's habits, reloaded whenever its folder changes or a run ends. */
 export function useHabits(
   monoId: string,
   status: MonoState["status"],
 ): Habit[] | undefined {
-  const [habits, setHabits] = useState<Habit[]>();
+  const [habits, setHabits] = useState<Habit[] | undefined>(() =>
+    loadedHabits.get(monoId),
+  );
   const working = status === "working";
   useEffect(() => {
     let live = true;
     const refresh = () => {
       void loadHabits(monoId)
         .then((next) => {
+          loadedHabits.set(monoId, next);
           if (live) setHabits(next);
         })
         .catch(() => {});
@@ -208,7 +214,8 @@ export function HabitsList({
   actions: HabitActions;
   onOpen: (id: string) => void;
 }) {
-  if (!habits) return <Empty>Loading…</Empty>;
+  // Blank for the moment it loads, rather than a line the list replaces.
+  if (!habits) return null;
   if (habits.length === 0) return <Empty>No habits yet</Empty>;
   return (
     <ul className="flex flex-col gap-px">
