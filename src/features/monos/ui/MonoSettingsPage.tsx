@@ -3,6 +3,7 @@ import { isImeComposition } from "../../../shared/lib/keyboard";
 import { ChevronRight } from "../../../shared/ui/icons";
 import { PixelMascot } from "../../projects/ui/PixelMascot";
 import { useLockOverscroll } from "../../../shared/hooks/useLockOverscroll";
+import { Popover } from "../../../shared/ui/Popover";
 import {
   defaultMonoName,
   findMono,
@@ -46,26 +47,8 @@ export function MonoSettingsPage({
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-none"
       >
         <div className="flex flex-col items-center px-3 pb-4 pt-6">
-          <PixelMascot
-            name={agent.mascot}
-            color={agent.color}
-            className="size-14 shrink-0"
-          />
+          <LookButton monoId={monoId} agent={agent} />
           <NameField key={monoId} monoId={monoId} fallback={agent.mascot} />
-        </div>
-
-        <div className="flex flex-col gap-3 px-3 pb-4">
-          <MascotPicker
-            current={agent.mascot}
-            color={agent.color}
-            onPick={(mascot) => saveMonoMascot(monoId, mascot)}
-          />
-          <ColorPicker
-            current={agent.color}
-            onPick={(color) =>
-              updateMono(monoId, (mono) => ({ ...mono, color }))
-            }
-          />
         </div>
 
         {children}
@@ -98,6 +81,63 @@ export function MonoSettingsPage({
         </div>
       </div>
     </div>
+  );
+}
+
+/** The Mono's face, which opens its mascots and colors in a popover. */
+function LookButton({ monoId, agent }: { monoId: string; agent: MonoLook }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button
+        ref={anchor}
+        type="button"
+        aria-label="Change mascot and color"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="Change mascot and color"
+        onClick={() => setOpen((value) => !value)}
+        className={`grid size-20 place-items-center rounded-2xl hover:bg-content/5 ${
+          open ? "bg-content/5" : ""
+        }`}
+      >
+        <PixelMascot
+          name={agent.mascot}
+          color={agent.color}
+          className="size-14 shrink-0"
+        />
+      </button>
+      {open ? (
+        <Popover
+          anchor={anchor}
+          side="bottom"
+          align="center"
+          width={272}
+          constrainHeight={false}
+          onDismiss={() => setOpen(false)}
+          role="dialog"
+          aria-label="Mascot and color"
+          className="flex flex-col gap-3 p-3"
+        >
+          <MascotPicker
+            columns={5}
+            current={agent.mascot}
+            color={agent.color}
+            onPick={(mascot) => saveMonoMascot(monoId, mascot)}
+          />
+          <div className="h-px bg-content/10" />
+          <ColorPicker
+            inline
+            columns={5}
+            current={agent.color}
+            onPick={(color) =>
+              updateMono(monoId, (mono) => ({ ...mono, color }))
+            }
+          />
+        </Popover>
+      ) : null}
+    </>
   );
 }
 

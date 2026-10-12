@@ -185,16 +185,20 @@ export function MascotPicker({
   current,
   color,
   onPick,
+  columns = 10,
 }: {
   current: string;
   color: string;
   onPick: (mascot: string) => void;
+  /** Five lays them out as larger tiles, for a popover of their own. */
+  columns?: 5 | 10;
 }) {
+  const large = columns === 5;
   return (
     <div
       role="radiogroup"
       aria-label="Mascot"
-      className="grid grid-cols-10 gap-0.5 px-1"
+      className={`grid gap-0.5 px-1 ${large ? "grid-cols-5 gap-1" : "grid-cols-10"}`}
     >
       {PROJECT_MASCOTS.map(({ name }) => {
         const selected = name === current;
@@ -207,7 +211,9 @@ export function MascotPicker({
             aria-label={name}
             title={name.charAt(0).toUpperCase() + name.slice(1)}
             onClick={() => onPick(name)}
-            className={`grid h-8 min-w-0 place-items-center rounded-md ${
+            className={`grid min-w-0 place-items-center ${
+              large ? "h-12 rounded-lg" : "h-8 rounded-md"
+            } ${
               selected
                 ? "bg-selection ring-1 ring-content/20"
                 : "hover:bg-content/6"
@@ -217,7 +223,7 @@ export function MascotPicker({
               name={name}
               color={color}
               still={!selected}
-              className="size-5"
+              className={large ? "size-8" : "size-5"}
             />
           </button>
         );
@@ -231,11 +237,14 @@ export function ColorPicker({
   current,
   onPick,
   inline = false,
+  columns = 10,
 }: {
   current: string;
   onPick: (color: string) => void;
   /** Opens the custom picker in place, for use inside another popover. */
   inline?: boolean;
+  /** Five lays them out as larger swatches, under the larger mascots. */
+  columns?: 5 | 10;
 }) {
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLDivElement>(null);
@@ -243,7 +252,10 @@ export function ColorPicker({
   return (
     <div ref={anchor} role="group" aria-label="Color">
       <ColorSwatchRow
-        className="grid grid-cols-10 place-items-center gap-0.5 px-1"
+        className={`grid place-items-center px-1 ${
+          columns === 5 ? "grid-cols-5 gap-y-2" : "grid-cols-10 gap-0.5"
+        }`}
+        size={columns === 5 ? "lg" : "sm"}
         colors={MONO_COLORS}
         labels={[
           "Blue",

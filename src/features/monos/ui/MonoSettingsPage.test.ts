@@ -85,6 +85,23 @@ it("shows how many habits and facts it has once they load", () => {
   expect(rows[2]).toBe("MemoryFacts and preferences this bot remembers.12");
 });
 
+it("keeps the mascots and colors in a popover opened from its face", () => {
+  act(() =>
+    root.render(
+      createElement(MonoSettingsPage, { monoId: "mono-1", agent, onOpen: vi.fn() }),
+    ),
+  );
+  expect(document.querySelector('[aria-label="Mascot"]')).toBeNull();
+  const face = container.querySelector('[aria-label="Change mascot and color"]') as HTMLElement;
+  act(() => face.click());
+  expect(face.getAttribute("aria-expanded")).toBe("true");
+  const popover = document.querySelector('[role="dialog"][aria-label="Mascot and color"]')!;
+  expect(popover.querySelector('[aria-label="Mascot"]')).not.toBeNull();
+  expect(popover.querySelector('[aria-label="Color"]')).not.toBeNull();
+  act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(document.querySelector('[aria-label="Mascot and color"]')).toBeNull();
+});
+
 function renderReset(onReset: () => Promise<void>) {
   act(() => root.render(createElement(MonoPreferencesPage, {
     monoId: "mono-1",
