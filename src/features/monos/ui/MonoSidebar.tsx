@@ -4,7 +4,8 @@ import { useDragResize } from "../../../shared/hooks/useDragResize";
 import { PanelRightToggle } from "../../../shared/ui/icons";
 
 const MIN_WIDTH = 340;
-let rememberedWidth = MIN_WIDTH;
+const DEFAULT_WIDTH = 400;
+let rememberedWidth = DEFAULT_WIDTH;
 let rememberedArtifactWidth = 560;
 
 /** The shared frame for a Mono's details and turn sidebars. */
@@ -30,7 +31,7 @@ export function MonoSidebar({
     // The overview hosts whole sessions and documents now, so it may grow
     // as wide as a reader; either way the chat keeps a good share.
     max: () => Math.min(960, Math.round(window.innerWidth * 0.62)),
-    defaultWidth: reader ? 560 : MIN_WIDTH,
+    defaultWidth: reader ? 560 : DEFAULT_WIDTH,
     initial: reader ? rememberedArtifactWidth : rememberedWidth,
     direction: "left",
     onCommit: (width) => {
