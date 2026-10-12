@@ -209,14 +209,17 @@ export function HabitsList({
   habits,
   actions,
   onOpen,
+  empty = <Empty>No habits yet</Empty>,
 }: {
   habits: Habit[] | undefined;
   actions: HabitActions;
   onOpen: (id: string) => void;
+  /** Shown once loaded with none. */
+  empty?: ReactNode;
 }) {
   // Blank for the moment it loads, rather than a line the list replaces.
   if (!habits) return null;
-  if (habits.length === 0) return <Empty>No habits yet</Empty>;
+  if (habits.length === 0) return <>{empty}</>;
   return (
     <ul className="flex flex-col gap-px">
       {habits.map((habit) => (

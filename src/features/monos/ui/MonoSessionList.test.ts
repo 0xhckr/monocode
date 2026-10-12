@@ -224,3 +224,59 @@ it("holds a loading card's place invisibly, and shows a known one at once when r
     "Cached review",
   );
 });
+
+it("narrows its cards by search, project and the sidebar's filters", async () => {
+  vi.mocked(listSessionsByProject).mockImplementation(async (cwd) => [
+    {
+      id: cwd === "/repo" ? launch.sessionId : "app-second",
+      cwd,
+      harness: cwd === "/repo" ? "codex" : "claude",
+      model: "gpt-6",
+      runtimeMode: "default",
+      title: cwd === "/repo" ? "Saved review" : "Fix login",
+      archived: cwd === "/repo",
+      createdAt: 1,
+      updatedAt: 2,
+    } as SessionSummary,
+  ]);
+  const launches = [
+    launch,
+    { ...launch, sessionId: "app-second", cwd: "/other", harness: "claude" },
+  ] as MonoSpawnedSession[];
+  const show = (props: Record<string, unknown>) =>
+    act(async () =>
+      root.render(
+        createElement(MonoSessionList, {
+          agent,
+          launches,
+          sessions: [],
+          onOpenSession,
+          ...props,
+        }),
+      ),
+    );
+  const cards = () =>
+    [...container.querySelectorAll("[data-session-card]")].map(
+      (card) => card.textContent ?? "",
+    );
+
+  await show({ query: "login" });
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0]).toContain("Fix login");
+  // The project's name is on the card, so it matches too.
+  await show({ query: "other" });
+  expect(cards()[0]).toContain("Fix login");
+  await show({
+    filters: {
+      showArchived: true,
+      hiddenHarnesses: [],
+      time: "all",
+      status: { working: false, needsApproval: false, done: false },
+    },
+  });
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0]).toContain("Saved review");
+  await show({ query: "nothing like it" });
+  expect(cards()).toHaveLength(0);
+  expect(container.textContent).toContain("No sessions match this search.");
+});

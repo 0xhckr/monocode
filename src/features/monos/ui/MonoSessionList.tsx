@@ -5,13 +5,26 @@ import {
   ChevronRight,
   ExternalLink,
   PanelRightToggle,
+  Search,
 } from "../../../shared/ui/icons";
 import {
   getSession,
   listSessionsByProject,
   type SessionSummary,
 } from "../../sessions/data/sessionStore";
-import { summaryFromSession } from "../../sessions/data/sessionHistory";
+import {
+  filterSessionsByArchive,
+  filterSessionsByQuery,
+  summaryFromSession,
+} from "../../sessions/data/sessionHistory";
+import {
+  DEFAULT_SESSION_SIDEBAR_FILTERS,
+  filterSessionsByHarness,
+  filterSessionsByStatus,
+  filterSessionsByTime,
+  type SessionSidebarFilters,
+} from "../../sessions/model/sessionFilters";
+import { fuzzyMatch } from "../../../shared/lib/fuzzy";
 import { resolveModel } from "../../sessions/model/models";
 import {
   hasPendingApproval,
@@ -23,7 +36,7 @@ import {
 import { HarnessIcon } from "../../sessions/ui/HarnessIcon";
 import { SessionCard } from "../../../app/shell/Sidebar";
 import type { MonoLook } from "../model/mono";
-import { PageHeader } from "./monoPanelParts";
+import { EmptyState, PageHeader } from "./monoPanelParts";
 
 /** A launched session open over the overview, live and fully usable. */
 export type ShownMonoSession = {
@@ -46,12 +59,17 @@ export function MonoSessionList({
   launches,
   sessions,
   history = [],
+  query = "",
+  filters = DEFAULT_SESSION_SIDEBAR_FILTERS,
   onOpenSession,
 }: {
   agent: MonoLook;
   launches: readonly MonoSpawnedSession[];
   sessions: readonly Session[];
   history?: readonly SessionSummary[];
+  /** Narrows the cards as the sidebar's session search does. */
+  query?: string;
+  filters?: SessionSidebarFilters;
   onOpenSession: (sessionId: string) => void | Promise<void>;
 }) {
   const launchesKey = JSON.stringify(
@@ -137,10 +155,85 @@ export function MonoSessionList({
     }
   };
 
+  const projectLabel = (cwd: string) =>
+    agent.projects.find((project) => project.path === cwd)?.name ??
+    projectName(cwd);
+  // Each launch as the sidebar would list it, so its search and filters
+  // apply as they do there. One not yet looked up stands in from its launch.
+  const rows = launches.map((launch): SessionSummary => {
+    const live = sessions.find((entry) => entry.id === launch.sessionId);
+    const saved =
+      history.find((entry) => entry.id === launch.sessionId) ??
+      stored.byId.get(launch.sessionId);
+    if (live)
+      return {
+        ...saved,
+        ...summaryFromSession(live, saved),
+        updatedAt: saved?.updatedAt ?? Date.now(),
+      };
+    return (
+      saved ?? {
+        id: launch.sessionId,
+        cwd: launch.cwd,
+        harness: launch.harness,
+        model: launch.model,
+        runtimeMode: "auto",
+        title: launch.title,
+        createdAt: 0,
+        updatedAt: 0,
+      }
+    );
+  });
+  const busyIds = new Set<string>();
+  const approvalIds = new Set<string>();
+  const doneIds = new Set<string>();
+  for (const row of rows) {
+    const live = sessions.find((entry) => entry.id === row.id);
+    if (live?.busy) busyIds.add(row.id);
+    else if (live && (hasPendingApproval(live.blocks) || live.pendingQuestion))
+      approvalIds.add(row.id);
+    else if (live || row.createdAt) doneIds.add(row.id);
+  }
+  const filtered = filterSessionsByStatus(
+    filterSessionsByTime(
+      filterSessionsByHarness(
+        // Archived launches stay with the rest; the filter narrows to them.
+        filters.showArchived ? filterSessionsByArchive(rows, true) : rows,
+        filters.hiddenHarnesses,
+      ),
+      filters.time,
+      Date.now(),
+    ),
+    filters.status,
+    busyIds,
+    approvalIds,
+    doneIds,
+  );
+  // The project a session runs in is on its card, so it is searched too.
+  const needle = query.trim();
+  const matched = new Set(
+    needle
+      ? [
+          ...filterSessionsByQuery(filtered, needle),
+          ...filtered.filter(
+            (row) => fuzzyMatch(needle, projectLabel(row.cwd)) != null,
+          ),
+        ].map((row) => row.id)
+      : filtered.map((row) => row.id),
+  );
+  const shown = launches.filter((launch) => matched.has(launch.sessionId));
+
+  if (launches.length > 0 && shown.length === 0)
+    return (
+      <EmptyState icon={Search}>
+        No sessions match {needle ? "this search" : "these filters"}.
+      </EmptyState>
+    );
+
   return (
     <div>
       <div className="flex flex-col gap-1">
-        {launches.map((launch) => {
+        {shown.map((launch) => {
           const live = sessions.find((entry) => entry.id === launch.sessionId);
           const saved =
             history.find((entry) => entry.id === launch.sessionId) ??

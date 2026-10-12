@@ -1,6 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "../../../app/shell/TitleBar";
-import { Clock, File, MessageMultiple, Plus } from "../../../shared/ui/icons";
+import {
+  Clock,
+  File,
+  ListFilter,
+  MessageMultiple,
+  Plus,
+  Search,
+} from "../../../shared/ui/icons";
 import { useLockOverscroll } from "../../../shared/hooks/useLockOverscroll";
 import { artifactLabel, type ArtifactCard } from "../../artifacts/artifacts";
 import type { SessionSummary } from "../../sessions/data/sessionStore";
@@ -16,8 +23,15 @@ import {
   MonoSessionList,
   type ShownMonoSession,
 } from "./MonoSessionList";
-import { Empty } from "./monoPanelParts";
+import { EmptyState } from "./monoPanelParts";
 import { PanelStack, type StackPage } from "./PanelStack";
+import { SessionFiltersMenu } from "../../sessions/ui/SessionFiltersMenu";
+import {
+  DEFAULT_SESSION_SIDEBAR_FILTERS,
+  hasActiveSessionFilters,
+  type SessionSidebarFilters,
+} from "../../sessions/model/sessionFilters";
+import { HARNESSES, type HarnessId } from "../../sessions/model/session";
 import { MonoSidebar, MonoSidebarHeader } from "./MonoSidebar";
 
 export type MonoOverviewTab = "sessions" | "habits" | "documents";
@@ -90,8 +104,16 @@ export function MonoOverview({
   const habits = useHabits(monoId, state.status);
   const actions = habitActions(monoId);
   const [routes, setRoutes] = useState<Route[]>([]);
-  // Another Mono starts at its own front page.
-  useEffect(() => setRoutes([]), [monoId]);
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<SessionSidebarFilters>(
+    DEFAULT_SESSION_SIDEBAR_FILTERS,
+  );
+  // Another Mono starts at its own front page, with all its sessions.
+  useEffect(() => {
+    setRoutes([]);
+    setQuery("");
+    setFilters(DEFAULT_SESSION_SIDEBAR_FILTERS);
+  }, [monoId]);
   const push = (route: Route) => setRoutes((current) => [...current, route]);
   const back = () => setRoutes((current) => current.slice(0, -1));
 
@@ -200,6 +222,17 @@ export function MonoOverview({
             ) : null
           }
         />
+        {tab === "sessions" && launches.length ? (
+          <SessionSearchBar
+            query={query}
+            onQueryChange={setQuery}
+            filters={filters}
+            onFiltersChange={setFilters}
+            harnesses={HARNESSES.filter((harness) =>
+              launches.some((launch) => launch.harness === harness),
+            )}
+          />
+        ) : null}
         <div
           ref={lock}
           role="tabpanel"
@@ -217,17 +250,28 @@ export function MonoOverview({
                   launches={[...launches].reverse()}
                   sessions={sessions}
                   history={history}
+                  query={query}
+                  filters={filters}
                   onOpenSession={onOpenSession}
                 />
               </div>
             ) : (
-              <Empty>Sessions it starts show up here</Empty>
+              <EmptyState icon={MessageMultiple}>
+                Ask {agent.name} to start a session on one of your projects,
+                like a bug fix or a review, and it shows up here.
+              </EmptyState>
             )
           ) : tab === "habits" ? (
             <HabitsList
               habits={habits}
               actions={actions}
               onOpen={(id) => push({ kind: "habit", id })}
+              empty={
+                <EmptyState icon={Clock}>
+                  Ask {agent.name} to put recurring work on a schedule, like a
+                  morning digest or a weekly report.
+                </EmptyState>
+              }
             />
           ) : documents.length ? (
             <ul className="flex flex-col gap-px">
@@ -238,11 +282,86 @@ export function MonoOverview({
               ))}
             </ul>
           ) : (
-            <Empty>Documents it writes show up here</Empty>
+            <EmptyState icon={File}>
+              Ask {agent.name} to write something up, like a plan or a summary,
+              and it shows up here.
+            </EmptyState>
           )}
         </div>
       </PanelStack>
     </MonoSidebar>
+  );
+}
+
+/** The sidebar's session search and filters, over the Mono's sessions. */
+function SessionSearchBar({
+  query,
+  onQueryChange,
+  filters,
+  onFiltersChange,
+  harnesses,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+  filters: SessionSidebarFilters;
+  onFiltersChange: (filters: SessionSidebarFilters) => void;
+  harnesses: HarnessId[];
+}) {
+  const filterButton = useRef<HTMLButtonElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const active = hasActiveSessionFilters(filters);
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-stroke px-2">
+      <div className="relative flex h-7 min-w-0 flex-1 items-center">
+        <Search className="pointer-events-none absolute left-2 size-3 shrink-0 opacity-50" />
+        <input
+          type="text"
+          value={query}
+          placeholder="Search sessions..."
+          aria-label="Search sessions"
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || !query) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onQueryChange("");
+          }}
+          className="h-full w-full min-w-0 rounded-md bg-transparent py-0 pl-7 pr-2 text-[12px] text-content outline-none placeholder:text-content/35"
+        />
+      </div>
+      <button
+        ref={filterButton}
+        type="button"
+        title="Filter sessions"
+        aria-label="Filter sessions"
+        aria-expanded={!!menu}
+        aria-haspopup="menu"
+        onClick={() => {
+          if (menu) return setMenu(null);
+          const rect = filterButton.current?.getBoundingClientRect();
+          if (rect) setMenu({ x: rect.right - 228, y: rect.bottom + 2 });
+        }}
+        className={`grid size-6 place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content ${
+          menu || active ? "bg-selection text-content" : ""
+        }`}
+      >
+        <ListFilter className="size-3" strokeWidth={1.75} />
+      </button>
+      {menu ? (
+        <SessionFiltersMenu
+          x={menu.x}
+          y={menu.y}
+          harnesses={harnesses}
+          filters={filters}
+          onChange={onFiltersChange}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
+    </div>
   );
 }
 

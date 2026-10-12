@@ -5,7 +5,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { ChevronLeft } from "../../../shared/ui/icons";
+import { ChevronLeft, type IconComponent } from "../../../shared/ui/icons";
 import { IconButton } from "../../../app/shell/TitleBar";
 import { PROJECT_MASCOTS } from "../../projects/model/projectMascots";
 import { MONO_COLORS } from "../model/mono";
@@ -185,6 +185,31 @@ export function Empty({ children }: { children: ReactNode }) {
     <p className="px-2 py-6 text-center text-[12px] text-content/45">
       {children}
     </p>
+  );
+}
+
+/**
+ * An empty tab: its icon over a line on how it fills, centered in the space
+ * the list would take.
+ */
+export function EmptyState({
+  icon: Icon,
+  children,
+}: {
+  icon: IconComponent;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+      <Icon
+        className="size-4.5 text-content/55"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <p className="max-w-72 text-[12px] leading-4.5 text-content/55 text-balance">
+        {children}
+      </p>
+    </div>
   );
 }
 
