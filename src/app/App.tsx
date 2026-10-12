@@ -12596,6 +12596,10 @@ function Workspace({
             // The Mono view covers the workspace, so a review opens
             // beside the chat rather than in a hidden tab.
             onOpenDiff={onOpenMonoDiff}
+            // The Mono runs this session; handing it off or asking for a
+            // second opinion belongs in its own tab.
+            onSecondOpinion={undefined}
+            onHandoff={undefined}
             visible={monoCovers}
             focused={monoShownSessionActive && !projectTerminalFocused}
             inSplit={false}
