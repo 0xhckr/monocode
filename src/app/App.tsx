@@ -18,6 +18,7 @@ import { acceptQuickLaunch } from "./model/quickLaunchSession";
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation";
 import { useIdleSessionDetach } from "./hooks/useIdleSessionDetach";
 import { HarnessEventQueue } from "./model/harnessFlush";
+import { updateSessionState } from "./model/sessionState";
 import {
   handleAgentApp,
   canAccessAgentAppProject,
@@ -1609,15 +1610,21 @@ function Workspace({
           );
         },
         (batches) => {
-          const prev = sessionsRef.current;
-          const next = prev.map((session) => {
-            const events = batches.get(session.id);
-            return events ? applyHarnessEvents(session, events) : session;
-          });
-          if (!next.some((session, index) => session !== prev[index])) return;
-          sessionsRef.current = next;
-          syncDockBadge(next);
-          setSessions(next);
+          const previous = sessionsRef.current;
+          const next = updateSessionState(
+            sessionsRef,
+            setSessions,
+            (current) => {
+              const updated = current.map((session) => {
+                const events = batches.get(session.id);
+                return events ? applyHarnessEvents(session, events) : session;
+              });
+              return updated.some((session, index) => session !== current[index])
+                ? updated
+                : current;
+            },
+          );
+          if (next !== previous) syncDockBadge(next);
         },
       ),
   );
@@ -2620,14 +2627,16 @@ function Workspace({
 
   const onSelectProviderAccount = useCallback(
     (provider: ProviderAccountProvider, accountId: string) => {
-      if (!active || active.harness !== provider) return;
-      const currentId = active.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
-      if (currentId === accountId) return;
+      const current = sessionsRef.current.find(
+        (session) => session.id === active?.id,
+      );
+      if (!current || current.harness !== provider) return;
 
-      if (active.blocks.length === 0 && !active.busy) {
-        setSessions((current) =>
-          current.map((session) =>
-            session.id === active.id
+      if (current.blocks.length === 0 && !current.busy) {
+        if (current.providerAccountId === accountId) return;
+        updateSessionState(sessionsRef, setSessions, (sessions) =>
+          sessions.map((session) =>
+            session.id === current.id
               ? { ...session, providerAccountId: accountId }
               : session,
           ),
@@ -2635,25 +2644,31 @@ function Workspace({
         return;
       }
 
+      const currentId = current.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+      if (currentId === accountId) return;
+
       // Provider thread ids are account-owned. Keep the current conversation
       // pinned to its account and open a clean one for the selected profile.
       const session = {
         ...newSession(
-          active.harness,
-          active.cwd,
-          active.model,
-          active.runtimeMode,
-          active.modelSettings,
+          current.harness,
+          current.cwd,
+          current.model,
+          current.runtimeMode,
+          current.modelSettings,
         ),
         providerAccountId: accountId,
       };
       const tab = newTab(session.id);
-      setSessions((current) => [...current, session]);
-      appendTab(tab, active.cwd);
+      updateSessionState(sessionsRef, setSessions, (sessions) => [
+        ...sessions,
+        session,
+      ]);
+      appendTab(tab, current.cwd);
       setActiveTabId(tab.id);
       setComposerFocused(true);
     },
-    [active, appendTab],
+    [active?.id, appendTab],
   );
 
   const onOpenWhatsNew = useCallback((version: string) => {
