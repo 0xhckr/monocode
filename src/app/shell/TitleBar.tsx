@@ -454,7 +454,6 @@ function TabStripChevron({
 export function IconButton({
   label,
   active,
-  selected,
   accent,
   disabled,
   onClick,
@@ -463,8 +462,6 @@ export function IconButton({
 }: {
   label: string;
   active?: boolean;
-  /** On, with its background filled like a selected tab. */
-  selected?: boolean;
   accent?: boolean;
   disabled?: boolean;
   onClick?: () => void;
@@ -476,7 +473,7 @@ export function IconButton({
       type="button"
       title={label}
       aria-label={label}
-      aria-pressed={active || selected || accent}
+      aria-pressed={active || accent}
       aria-disabled={disabled}
       data-tauri-drag-region="false"
       onClick={() => {
@@ -514,13 +511,11 @@ export function IconButton({
       className={`grid size-6 place-items-center rounded-md ${
         disabled
           ? "text-content/25"
-          : selected
-            ? "bg-content/8 text-content hover:bg-content/10"
-            : accent
-              ? "text-accent hover:bg-content/10"
-              : active
-                ? "text-content hover:bg-content/10"
-                : "text-content/50 hover:bg-content/10 hover:text-content"
+          : accent
+            ? "text-accent hover:bg-content/10"
+            : active
+              ? "text-content hover:bg-content/10"
+              : "text-content/50 hover:bg-content/10 hover:text-content"
       }`}
     >
       {children}

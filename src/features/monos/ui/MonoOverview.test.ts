@@ -124,12 +124,19 @@ it("toggles activity from beside the panel toggle", async () => {
     container.querySelector<HTMLButtonElement>(
       '[aria-label="Show activity"], [aria-label="Hide activity"]',
     )!;
-  expect(button().getAttribute("aria-pressed")).toBeNull();
+  expect(button().getAttribute("aria-pressed")).toBe("false");
+  expect(
+    button().querySelector("[data-tab-label]")!.getAttribute("data-tab-label"),
+  ).toBe("closed");
   act(() => button().click());
   expect(onTabChange).toHaveBeenLastCalledWith("activity");
   await render("activity", onTabChange);
   expect(button().getAttribute("aria-label")).toBe("Hide activity");
   expect(button().getAttribute("aria-pressed")).toBe("true");
+  expect(
+    button().querySelector("[data-tab-label]")!.getAttribute("data-tab-label"),
+  ).toBe("open");
+  expect(button().textContent).toBe("Activity");
   act(() => button().click());
   expect(onTabChange).toHaveBeenLastCalledWith("documents");
 });
