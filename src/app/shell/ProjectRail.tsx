@@ -59,6 +59,7 @@ import {
   loadProjectGroups,
   projectGroupColor,
   projectGroupIdForPath,
+  reorderProjectGroups,
   updateProjectGroup,
   type ProjectGroup,
 } from "../../features/projects/model/projectGroups";
@@ -335,6 +336,8 @@ export function ProjectRail({
     !!monos?.activeId;
   const pinnedIds = sections.pinned.map((item) => item.path);
   const projectIds = groupedProjectSections.ungrouped.map((item) => item.path);
+  const groupIds = groupedProjectSections.grouped.map(({ group }) => group.id);
+  const groupSortable = useAnimatedReorder(groupIds, reorderProjectGroups, "y");
   const pinnedSortable = useAnimatedReorder(pinnedIds, onReorderPinned, "y");
   const projectSortable = useAnimatedReorder(
     projectIds,
@@ -458,6 +461,7 @@ export function ProjectRail({
                     <ProjectGroupSection
                       key={group.id}
                       group={group}
+                      groupSortable={groupSortable}
                       items={items}
                       muteStatuses={muteStatuses}
                       cwd={cwd}
@@ -685,8 +689,10 @@ function ProjectSectionHeader({
   );
 }
 
+/** One collapsible group in the rail; its header row is the drag handle for reordering groups. */
 function ProjectGroupSection({
   group,
+  groupSortable,
   items,
   muteStatuses,
   cwd,
@@ -707,6 +713,7 @@ function ProjectGroupSection({
   groupMascots,
 }: {
   group: ProjectGroup;
+  groupSortable: SortableHandle;
   items: RecentProject[];
   muteStatuses: ReadonlyMap<string, string | null>;
   cwd: string;
@@ -740,7 +747,8 @@ function ProjectGroupSection({
 
   return (
     <div
-      className={`shrink-0 overflow-hidden rounded-md ${
+      ref={(el) => groupSortable.setItemRef(group.id, el)}
+      className={`reorder-item relative shrink-0 overflow-hidden rounded-md ${
         expanded ? "mb-1.5 bg-content/5" : ""
       }`}
       data-project-group={group.id}
@@ -748,7 +756,10 @@ function ProjectGroupSection({
       aria-label={group.name}
     >
       <div
-        className="project-reorder-item group relative flex h-8 items-stretch rounded-md px-2 opacity-65 cursor-default"
+        className="project-reorder-item group relative flex h-8 touch-none items-stretch rounded-md px-2 opacity-65 cursor-default"
+        onPointerDown={(event) =>
+          groupSortable.onItemPointerDown(group.id, event)
+        }
         onContextMenu={(event) => {
           event.preventDefault();
           event.currentTarget
@@ -762,7 +773,10 @@ function ProjectGroupSection({
           aria-expanded={!group.collapsed}
           aria-label={`${group.name}, ${countLabel}`}
           title={`${group.name} · ${countLabel}`}
-          onClick={onToggleCollapsed}
+          onClick={() => {
+            if (groupSortable.consumeClick()) return;
+            onToggleCollapsed();
+          }}
           className="flex min-w-0 flex-1 cursor-default items-center gap-2 text-left transition-[padding] duration-150 motion-reduce:transition-none group-hover:pr-6 group-has-[:focus-visible]:pr-6"
         >
           <div className="grid size-4 shrink-0 place-items-center">

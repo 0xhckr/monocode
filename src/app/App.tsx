@@ -136,6 +136,7 @@ import {
   renameWorktreeBranch,
   sessionInWorktree,
   temporaryWorktreeBranchName,
+  worktreeDeletedExternally,
   worktreeSessionIds,
   type Worktree,
 } from "../features/source-control/model/worktrees";
@@ -682,6 +683,7 @@ import { findRemoteSessionTab } from "../features/connections/model/remoteSessio
 import {
   remotePath,
   remoteProjectFor,
+  remoteSessionGitCwd,
 } from "../features/connections/model/remoteProjects";
 import type { HostSession } from "../features/connections/model/protocol";
 import { AddRemoteProjectDialog } from "../features/connections/ui/AddRemoteProjectDialog";
@@ -1945,17 +1947,33 @@ function Workspace({
       ? active.branch || gitCwdBranches?.current || undefined
       : undefined;
   const remoteFilesProject = remoteProjectFor(sidebarCwd);
+  // The host checkout the remote tab is aimed at — the attached session's
+  // work path or a worktree picked before the first message.
+  const remoteTabCheckout = remoteFilesProject
+    ? remoteTabCwd(sidebarCwd, active?.id)
+    : undefined;
   const filesCwd = remoteFilesProject
     ? isRemoteProjectPath(gitCwd)
       ? gitCwd
       : remotePath(
           remoteFilesProject.environmentId,
-          remoteTabCwd(sidebarCwd, active?.id) ??
+          remoteTabCheckout ??
             (gitCwd && gitCwd !== sidebarCwd ? gitCwd : remoteFilesProject.cwd),
         )
     : gitCwd;
-  const gitCwdRef = useRef(filesCwd);
-  gitCwdRef.current = filesCwd;
+  // Git follows the session's own work path (a linked worktree included),
+  // never the terminal-following files cwd: a remote session working in a
+  // separate worktree diffed the main checkout and showed "No file changes".
+  const gitRootCwd = remoteFilesProject
+    ? remoteSessionGitCwd(
+        remoteFilesProject,
+        gitCwd,
+        sidebarCwd,
+        remoteTabCheckout,
+      )
+    : gitCwd;
+  const gitCwdRef = useRef(gitRootCwd);
+  gitCwdRef.current = gitRootCwd;
   const projectBranches = useProjectBranches(
     sidebarCwd,
     Boolean(sidebarCwd) && sidebarCwd !== "~",
@@ -3011,29 +3029,6 @@ function Workspace({
   const onNewTerminal = useCallback(() => {
     onOpenTerminal(terminalCwd);
   }, [terminalCwd, onOpenTerminal]);
-
-  const onShowProjectTerminal = useCallback(() => {
-    leaveCoveringMono();
-    const dock = findProjectTerminal(projectTerminalsRef.current, projectCwd);
-    if (dock && dock.pane.files.length > 0) {
-      if (!dock.open) {
-        setProjectTerminals((prev) =>
-          mapProjectTerminal(prev, projectCwd, (entry) =>
-            withDockOpen(entry, true),
-          ),
-        );
-      }
-      focusProjectTerminal();
-      return;
-    }
-    onOpenTerminal(terminalCwd);
-  }, [
-    terminalCwd,
-    focusProjectTerminal,
-    leaveCoveringMono,
-    onOpenTerminal,
-    projectCwd,
-  ]);
 
   const onNewTerminalInSession = useCallback(
     (sessionId: string) => {
@@ -8059,16 +8054,18 @@ function Workspace({
           }
           if (turnGen.current.get(sessionId) !== gen) return;
           if (wrap) {
-            setSessions((prev) =>
-              prev.map((s) => {
-                if (s.id !== sessionId) return s;
-                const ready = isPreparingHandoff(s)
-                  ? completeHandoff(s, wrap.text)
-                  : s;
-                // A command owns its arguments; deliver the recap with the next chat prompt.
-                return rawCommand ? ready : consumeHandoff(ready);
-              }),
-            );
+            // Settle the ref too: the flush in `finally` rebuilds sessions from
+            // it, and a stale ref would drop the consumed flag and resend the
+            // recap with every later turn.
+            sessionsRef.current = sessionsRef.current.map((s) => {
+              if (s.id !== sessionId) return s;
+              const ready = isPreparingHandoff(s)
+                ? completeHandoff(s, wrap.text)
+                : s;
+              // A command owns its arguments; deliver the recap with the next chat prompt.
+              return rawCommand ? ready : consumeHandoff(ready);
+            });
+            setSessions(sessionsRef.current);
           }
           buildSucceeded = true;
         } catch (error: unknown) {
@@ -8148,6 +8145,27 @@ function Workspace({
                 : finalized;
             }),
           );
+          // A worktree removed outside the app fails every turn. Detach the
+          // session as an in-app removal would, so it can pick a new checkout.
+          const worktreePath = current.worktreeCwd;
+          if (providerFailureSeen && worktreePath) {
+            void worktreeDeletedExternally(worktreePath)
+              .then((deleted) => {
+                if (!deleted || switchingWorktrees.current.has(sessionId))
+                  return;
+                // Through the ref too, or a pending event flush puts it back.
+                sessionsRef.current = sessionsRef.current.map((s) =>
+                  s.id === sessionId &&
+                  !s.busy &&
+                  !s.worktreeRemoved &&
+                  s.worktreeCwd === worktreePath
+                    ? detachSessionWorktree(s, s.cwd, worktreePath)
+                    : s,
+                );
+                setSessions(sessionsRef.current);
+              })
+              .catch(() => undefined);
+          }
           // Next tick: the flush above has rendered by then, so the banner
           // quotes the reply's final text rather than the previous batch.
           window.setTimeout(() => {
@@ -13356,15 +13374,18 @@ function Workspace({
                       ? onNewTerminal
                       : undefined
                   }
-                  onShowTerminal={
+                  onToggleProjectTerminal={
                     !monoCovers && isLocalProject(projectCwd)
-                      ? onShowProjectTerminal
+                      ? onToggleProjectTerminal
                       : undefined
                   }
                   projectTerminalActive={
                     !monoCovers &&
                     !!currentProjectDock &&
                     currentProjectDock.pane.files.length > 0
+                  }
+                  projectTerminalOpen={
+                    !monoCovers && !!currentProjectDock?.open
                   }
                 />
               )}
