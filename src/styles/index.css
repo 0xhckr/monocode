@@ -2585,6 +2585,13 @@ html.theme-light .mono-pill {
   font-size: 13px;
 }
 
+/* Reader frames supply their own inset, so a leading heading's mt-6 would
+   only double the top padding. */
+[data-artifact-reader] .agent-markdown > :first-child,
+[data-artifact-reader] .agent-markdown > .agent-markdown-block:first-child > * {
+  margin-top: 0;
+}
+
 .agent-chat-bubble-md.agent-markdown > :first-child,
 .agent-chat-bubble-md.agent-markdown > .agent-markdown-block:first-child > * {
   margin-top: 0;
