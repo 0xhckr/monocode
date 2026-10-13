@@ -2574,10 +2574,15 @@ html.theme-light .mono-pill {
   margin-top: 2px;
 }
 
-/* The activity panel is narrow: its steps read at the panel's size. */
+/* The activity panel's steps and what was said between them read at the
+   size of the commands they run. */
 .mono-activity-steps .text-sm {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.mono-activity-prose .mono-run-report.agent-markdown {
+  font-size: 13px;
 }
 
 .agent-chat-bubble-md.agent-markdown > :first-child,

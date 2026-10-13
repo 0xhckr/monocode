@@ -4,6 +4,7 @@ import {
   Clock,
   File,
   FileDiff,
+  ListBullet,
   ListFilter,
   MessageMultiple,
   Plus,
@@ -38,9 +39,19 @@ import { MonoSidebar, MonoSidebarHeader } from "./MonoSidebar";
 import type { SessionChangeTotals } from "../../sessions/ui/SessionReview";
 import { MonoChangesView, type MonoChangesRequest } from "./MonoChangesView";
 
-export type MonoOverviewTab = "sessions" | "habits" | "documents" | "changes";
+export type MonoOverviewTab =
+  | "activity"
+  | "sessions"
+  | "habits"
+  | "documents"
+  | "changes";
 
-const TABS: { id: MonoOverviewTab; label: string; icon: typeof Clock }[] = [
+// Activity sits apart, beside the panel toggle, since it follows the chat.
+const TABS: {
+  id: Exclude<MonoOverviewTab, "activity">;
+  label: string;
+  icon: typeof Clock;
+}[] = [
   { id: "sessions", label: "Sessions", icon: MessageMultiple },
   { id: "documents", label: "Documents", icon: File },
   { id: "habits", label: "Habits", icon: Clock },
@@ -75,6 +86,8 @@ type Props = {
   /** Documents it has written, oldest first. */
   documents: readonly ArtifactCard[];
   changes?: MonoOverviewChanges;
+  /** The steps of the turn picked from the chat, if one is. */
+  activity?: ReactNode;
   tab: MonoOverviewTab;
   onTabChange: (tab: MonoOverviewTab) => void;
   onOpenSession: (sessionId: string) => void | Promise<void>;
@@ -106,6 +119,7 @@ export function MonoOverview({
   history,
   documents,
   changes,
+  activity,
   tab,
   onTabChange,
   onOpenSession,
@@ -131,6 +145,11 @@ export function MonoOverview({
   // at another tab.
   const [changesVisited, setChangesVisited] = useState(tab === "changes");
   if (tab === "changes" && !changesVisited) setChangesVisited(true);
+  // The activity button toggles back to the tab it was opened from.
+  const lastTab = useRef<MonoOverviewTab>(
+    tab === "activity" ? "sessions" : tab,
+  );
+  if (tab !== "activity") lastTab.current = tab;
   // Another Mono starts at its own front page, with all its sessions.
   useEffect(() => {
     setRoutes([]);
@@ -207,7 +226,7 @@ export function MonoOverview({
     });
 
   const habitsFull = !habits || habits.length >= HABITS_MAX;
-  const counts: Record<MonoOverviewTab, number | undefined> = {
+  const counts: Record<(typeof TABS)[number]["id"], number | undefined> = {
     sessions: launches.length,
     habits: habits?.length,
     documents: documents.length,
@@ -235,19 +254,30 @@ export function MonoOverview({
           }
           onClose={onClose}
           actions={
-            tab === "habits" ? (
+            <>
+              {tab === "habits" ? (
+                <IconButton
+                  label={
+                    habits && habits.length >= HABITS_MAX
+                      ? `At most ${HABITS_MAX} habits`
+                      : "New habit"
+                  }
+                  disabled={habitsFull}
+                  onClick={() => push({ kind: "new-habit" })}
+                >
+                  <Plus className="size-3.5" strokeWidth={1.75} />
+                </IconButton>
+              ) : null}
               <IconButton
-                label={
-                  habits && habits.length >= HABITS_MAX
-                    ? `At most ${HABITS_MAX} habits`
-                    : "New habit"
+                label={tab === "activity" ? "Hide activity" : "Show activity"}
+                selected={tab === "activity"}
+                onClick={() =>
+                  onTabChange(tab === "activity" ? lastTab.current : "activity")
                 }
-                disabled={habitsFull}
-                onClick={() => push({ kind: "new-habit" })}
               >
-                <Plus className="size-3.5" strokeWidth={1.75} />
+                <ListBullet className="size-3.5" strokeWidth={1.75} />
               </IconButton>
-            ) : null
+            </>
           }
         />
         {tab === "sessions" && launches.length ? (
@@ -282,12 +312,23 @@ export function MonoOverview({
         <div
           ref={lock}
           role="tabpanel"
-          aria-label={TABS.find((entry) => entry.id === tab)?.label}
+          aria-label={
+            tab === "activity"
+              ? "Activity"
+              : TABS.find((entry) => entry.id === tab)?.label
+          }
           hidden={tab === "changes"}
           className="min-h-0 flex-1 overflow-y-auto overscroll-none px-2 py-2"
           data-mono-overview={tab === "changes" ? undefined : tab}
         >
-          {tab === "sessions" ? (
+          {tab === "activity" ? (
+            (activity ?? (
+              <EmptyState icon={ListBullet}>
+                Select the activity on one of {agent.name}&apos;s messages to
+                see each step it took.
+              </EmptyState>
+            ))
+          ) : tab === "sessions" ? (
             launches.length ? (
               // Cards carry their own inset; this lines their icons up with
               // the tabs above, as the habit and document rows do.
@@ -423,7 +464,7 @@ function OverviewTabs({
   onChange,
 }: {
   tab: MonoOverviewTab;
-  counts: Record<MonoOverviewTab, number | undefined>;
+  counts: Record<(typeof TABS)[number]["id"], number | undefined>;
   onChange: (tab: MonoOverviewTab) => void;
 }) {
   return (

@@ -3440,7 +3440,7 @@ export function MonoActivityTrail({
             <li
               key={first.id}
               data-mono-activity-block={first.id}
-              className="min-w-0 px-1 text-content/80"
+              className="mono-activity-prose min-w-0 px-1 text-content/80"
             >
               <AgentMarkdown
                 text={first.text}
