@@ -1672,6 +1672,9 @@ function SidebarComponent({
   const changeAdditions = changeStats?.additions ?? 0;
   const changeDeletions = changeStats?.deletions ?? 0;
   const hasChanges = (changeStats?.files ?? 0) > 0;
+  const hasUnseenFinished = listedSessions.some((session) =>
+    unseenFinishedIds.has(session.id),
+  );
   const hasChangeStats = changeAdditions > 0 || changeDeletions > 0;
   const changesLabel = hasChangeStats
     ? [
@@ -2311,6 +2314,7 @@ function SidebarComponent({
           changeAdditions={changeAdditions}
           changeDeletions={changeDeletions}
           hasChanges={hasChanges}
+          hasUnseenFinished={hasUnseenFinished}
           inboxUnseen={inboxUnseen}
           onSelectProject={onSelectProject}
           onOpenProject={onOpenProject}
@@ -2556,6 +2560,7 @@ function CompactProjectRail({
   changeAdditions,
   changeDeletions,
   hasChanges,
+  hasUnseenFinished,
   inboxUnseen,
   onSelectProject,
   onOpenProject,
@@ -2587,6 +2592,8 @@ function CompactProjectRail({
   changeAdditions: number;
   changeDeletions: number;
   hasChanges: boolean;
+  /** A session here finished a reply the user has not opened. */
+  hasUnseenFinished: boolean;
   inboxUnseen: boolean;
   onSelectProject?: (path: string) => void;
   onOpenProject?: () => void;
@@ -2735,7 +2742,13 @@ function CompactProjectRail({
             <CompactRailAction
               key={itemId}
               tab
-              label={itemId === "changes" ? changesLabel : TAB_LABELS[itemId]}
+              label={
+                itemId === "changes"
+                  ? changesLabel
+                  : itemId === "sessions" && hasUnseenFinished
+                    ? "Sessions, new replies"
+                    : TAB_LABELS[itemId]
+              }
               tipLabel={TAB_LABELS[itemId]}
               diff={
                 itemId === "changes"
@@ -2744,7 +2757,10 @@ function CompactProjectRail({
               }
               icon={COMPACT_TAB_ICONS[itemId]}
               active={workspaceActive && tabShown && activeTab === itemId}
-              dot={itemId === "changes" && hasChanges}
+              dot={
+                (itemId === "changes" && hasChanges) ||
+                (itemId === "sessions" && hasUnseenFinished)
+              }
               onClick={() => openWorkspaceTab(itemId)}
             />
           ))}
