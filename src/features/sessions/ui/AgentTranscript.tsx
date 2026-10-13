@@ -2369,7 +2369,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
 
 /**
  * A Mono's emoji answer, on the corner of the message it answers. The top
- * left keeps it clear of the bubble's tail and the hover actions below.
+ * left keeps it clear of the hover actions below.
  */
 function MonoReactionBadge({ emoji, live }: { emoji: string; live: boolean }) {
   return (
@@ -2629,10 +2629,6 @@ function UserMessageBlock({
                   ? "border border-dashed border-content/30 bg-content/4"
                   : "bg-content/10"
               } ${editing ? "edit-last-turn-bubble" : ""} ${
-                bubbleTail && chat && !block.draft && !compactFollowUp
-                  ? `agent-chat-bubble-tail-right ${singleLine ? "[--agent-bubble-radius:1.125rem]" : "[--agent-bubble-radius:0.75rem]"}`
-                  : ""
-              } ${
                 chat
                   ? `w-fit max-w-[min(100%,36rem)] ${singleLine ? "rounded-full" : "rounded-xl"}`
                   : "rounded-lg border border-content/10"
