@@ -224,6 +224,36 @@ describe("model picker", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["claude:opus-5", "Claude Opus 5 (1M context)", "Opus 5 (1M context)"],
+    [
+      "claude:opus-5-5",
+      "Claude Opus 5.5 (1M context)",
+      "Opus 5.5 (1M context)",
+    ],
+    ["claude:opus-5-5", "Opus 5.5 (1M context)", "Opus 5.5 (1M context)"],
+  ])("keeps %s version and context qualifier visible", (id, name, visible) => {
+    setHarnessModels("claude", [{ id, harness: "claude", name }]);
+    act(() =>
+      root.render(
+        createElement(ModelPicker, {
+          harness: "claude",
+          model: id,
+          values: {},
+          onChange: vi.fn(),
+          onSettingsChange: vi.fn(),
+        }),
+      ),
+    );
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-haspopup="menu"]',
+    )!;
+    expect(trigger.querySelector("span")?.textContent).toBe(visible);
+    expect(trigger.getAttribute("aria-label")).toContain(name);
+    expect(trigger.title).toContain(name);
+  });
+
   it("lists Claude Opus 5.5 after Opus 5 in the built-in Claude catalog", () => {
     act(() =>
       root.render(
@@ -240,7 +270,9 @@ describe("model picker", () => {
     const trigger = container.querySelector<HTMLButtonElement>(
       'button[aria-haspopup="menu"]',
     )!;
-    expect(trigger.textContent).toContain("Claude Opus 5.5");
+    expect(trigger.querySelector("span")?.textContent).toBe("Opus 5.5");
+    expect(trigger.getAttribute("aria-label")).toContain("Claude Opus 5.5");
+    expect(trigger.title).toContain("Claude Opus 5.5");
 
     act(() => trigger.click());
     const modelRow = [
@@ -816,9 +848,7 @@ describe("model picker", () => {
       );
       const effortRow = [
         ...container.querySelectorAll<HTMLButtonElement>("button"),
-      ].find((button) =>
-        button.textContent?.startsWith(settingLabel),
-      )!;
+      ].find((button) => button.textContent?.startsWith(settingLabel))!;
       hover(effortRow);
 
       expect(
