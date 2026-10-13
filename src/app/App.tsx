@@ -1620,7 +1620,9 @@ function Workspace({
                 const events = batches.get(session.id);
                 return events ? applyHarnessEvents(session, events) : session;
               });
-              return updated.some((session, index) => session !== current[index])
+              return updated.some(
+                (session, index) => session !== current[index],
+              )
                 ? updated
                 : current;
             },
@@ -2645,7 +2647,8 @@ function Workspace({
         return;
       }
 
-      const currentId = current.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+      const currentId =
+        current.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
       if (currentId === accountId) return;
 
       // Provider thread ids are account-owned. Keep the current conversation
@@ -12737,8 +12740,6 @@ function Workspace({
             onOpen: onOpenRailMono,
             onCreate: onCreateMono,
             onDelete: onDeleteRailMono,
-            // Release notes come first; the intro waits its turn.
-            introAvailable: !whatsNewVersion,
           }
         : undefined,
     [
@@ -12748,7 +12749,6 @@ function Workspace({
       onOpenRailMono,
       onCreateMono,
       onDeleteRailMono,
-      whatsNewVersion,
     ],
   );
   const onDismissUpdate = useCallback(() => setUpdateNotice(null), []);
@@ -12777,7 +12777,7 @@ function Workspace({
         monoCovers
           ? () => {
               setMonoActivity(null);
-                      setMonoOverviewOpen(!monoOverviewShown);
+              setMonoOverviewOpen(!monoOverviewShown);
             }
           : undefined
       }
