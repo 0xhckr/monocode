@@ -4,7 +4,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dependencies = { npmHash: "npmDeps", cargoHash: "cargoDeps" };
+const dependencies = {
+  npmHash: "npmDeps",
+  cargoHash: "cargoDeps.vendorStaging",
+};
+const fakeHash = `sha256-${"A".repeat(43)}=`;
 
 export function refreshHashes(repository, buildDependency) {
   const hashFile = path.join(repository, "nix/dependency-hashes.json");
@@ -18,8 +22,13 @@ export function refreshHashes(repository, buildDependency) {
 
   try {
     for (const [key, attribute] of Object.entries(dependencies)) {
+      // A placeholder forces a fresh fixed-output build, even with cached hashes.
+      hashes[key] = fakeHash;
+      writeHashes();
       const result = buildDependency(attribute);
-      if (result.status === 0) continue;
+      if (result.status === 0) {
+        throw new Error(`Expected a hash mismatch for ${attribute}`);
+      }
 
       // Only recover a fixed-output hash mismatch, not network or build failures.
       const mismatch = result.output.match(
@@ -39,16 +48,16 @@ export function refreshHashes(repository, buildDependency) {
   }
 }
 
-function buildDependency(attribute) {
+export function buildDependency(attribute, repository = root) {
   const result = spawnSync(
     "nix",
     [
       "build",
-      `path:${root}#monocode.${attribute}`,
+      `path:${repository}#monocode.${attribute}`,
       "--no-link",
       "--print-build-logs",
     ],
-    { cwd: root, encoding: "utf8", maxBuffer: 100 * 1024 * 1024 },
+    { cwd: repository, encoding: "utf8", maxBuffer: 100 * 1024 * 1024 },
   );
   if (result.error) throw result.error;
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;

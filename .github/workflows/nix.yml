@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: 24
       - run: node --test scripts/update-nix-hashes.test.mjs
+      - run: node --test scripts/update-nix-hashes.integration.test.mjs
+        env:
+          MONOCODE_NIX_INTEGRATION: "1"
       - run: node scripts/update-nix-hashes.mjs
       - name: Commit refreshed hashes
         id: commit
@@ -64,4 +67,8 @@ jobs:
           node-version: 24
       - run: node --test scripts/update-nix-hashes.test.mjs
       - run: nix fmt -- --check flake.nix nix/package.nix
+      - run: node --test scripts/update-nix-hashes.integration.test.mjs
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          MONOCODE_NIX_INTEGRATION: "1"
       - run: nix flake check --print-build-logs

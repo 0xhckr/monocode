@@ -95,6 +95,8 @@ The package reads its version from `package.json`. Dependency hashes live in `ni
 node scripts/update-nix-hashes.mjs
 ```
 
+The updater temporarily substitutes placeholder hashes to force fresh npm and Cargo staging builds, even when old outputs are cached. It verifies the calculated hashes and restores the original file if either dependency fails. Run its cache regression test with `MONOCODE_NIX_INTEGRATION=1 node --test scripts/update-nix-hashes.integration.test.mjs` (requires Nix).
+
 The [Nix workflow](../.github/workflows/nix.yml) runs this automatically on pushes to `main`, published releases, and manual dispatch. It commits changed hashes to `main`, then builds that exact commit on Linux and macOS. Release events refresh `main`; they do not rewrite release tags. Pull requests build their submitted hashes without write access.
 
 The workflow requires Actions to have permission to push to `main`. If branch protection blocks bot commits, run the refresh command locally and include the hashes in your pull request. A concurrent push causes the bot's push to fail rather than overwrite newer changes; rerun the workflow to refresh the latest `main`. The workflow does not publish releases or update nixpkgs automatically.
