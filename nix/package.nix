@@ -78,7 +78,7 @@ rustPlatform.buildRustPackage {
 
   meta = {
     description = "A GUI for your coding agents";
-    homepage = "https://github.com/0xhckr/monocode";
+    homepage = "https://github.com/hardbeat920/monocode";
     license = lib.licenses.mit;
     mainProgram = "monocode";
     platforms = [

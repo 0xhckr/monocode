@@ -1,6 +1,6 @@
 # Install with Nix
 
-This fork provides a source-built flake package for x86_64 and aarch64 Linux and Apple Silicon macOS (`aarch64-darwin`). Intel macOS is not supported. Enable Nix's `nix-command` and `flakes` experimental features before using these commands.
+MonoCode provides a source-built flake package for x86_64 and aarch64 Linux and Apple Silicon macOS (`aarch64-darwin`). The Nix package does not support Intel macOS. Enable Nix's `nix-command` and `flakes` experimental features before using these commands.
 
 The flake pins nixpkgs to the current NixOS stable release, 26.05.
 
@@ -11,13 +11,13 @@ Install and sign in to at least one [supported agent CLI](providers.md) separate
 Run without installing:
 
 ```bash
-nix run github:0xhckr/monocode
+nix run github:hardbeat920/monocode
 ```
 
 Install in your user profile:
 
 ```bash
-nix profile add github:0xhckr/monocode
+nix profile add github:hardbeat920/monocode
 monocode
 ```
 
@@ -28,7 +28,7 @@ The first build compiles the frontend and Rust application and may take a while.
 Add the input to your system flake:
 
 ```nix
-inputs.monocode.url = "github:0xhckr/monocode";
+inputs.monocode.url = "github:hardbeat920/monocode";
 ```
 
 Pass your inputs into the existing `nixosSystem` or `darwinSystem` call:

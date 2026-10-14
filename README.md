@@ -29,12 +29,12 @@ On macOS, open the DMG and drag MonoCode to Applications. On Windows, run the in
 
 ### Nix, NixOS, and nix-darwin
 
-This fork includes a source-built Nix flake for Linux and macOS:
+MonoCode includes a source-built Nix flake for x86_64 and ARM Linux and Apple Silicon macOS:
 
 ```bash
-nix run github:0xhckr/monocode
+nix run github:hardbeat920/monocode
 # Or install in your user profile:
-nix profile add github:0xhckr/monocode
+nix profile add github:hardbeat920/monocode
 ```
 
 See [Nix installation](docs/nix.md) for NixOS, nix-darwin, and Home Manager configuration.
