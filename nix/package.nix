@@ -10,6 +10,7 @@
   wrapGAppsHook3,
   makeWrapper,
   gtk3,
+  glib-networking,
   webkitgtk_4_1,
   openssl,
 }:
@@ -52,6 +53,7 @@ rustPlatform.buildRustPackage {
 
   buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     gtk3
+    glib-networking
     webkitgtk_4_1
     openssl
   ];
